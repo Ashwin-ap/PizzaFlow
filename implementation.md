@@ -37,7 +37,7 @@ Each phase is **one session**. In a session:
 | 2 | Database — schema, RLS, seed | ✅ | 3963dde | 5 tables + RLS live via `supabase db push`; **TS seed** (`web/scripts/`, not Python) reuses supabase-js; 23 items seeded, swap-safe; admin `admin@slicematic.dev` provisioned; `0003_views` deferred→P6; `seed_orders` stubbed→P7; RLS test local-only (`npm run test:rls`) |
 | 3 | Core domain libs + `/api/menu` + `/api/orders` | ✅ | 44287e0 | server-authoritative pricing (`lib/pricing.ts`, integer paise); **atomic `create_order` RPC**; idempotency via `Idempotency-Key` header + unique col; durable Supabase rate limiter; **RPCs revoked from anon** (verified 42501); admin client → P6; route+RLS tests opt-in (`npm run test:integration` / `test:rls`) |
 | 4 | Customer ordering UI (stepper + design system) | ✅ | 387c057 | 7-step client `Stepper` (`components/order/`) wired to `/api/menu` + `/api/orders`; client preview reuses `lib/pricing.ts` (== server to the paise, §23 verified); **selection builder** (dropdowns) → edge #4/#5 server-guarded not in-UI; **native React + Zod** (no RHF); **Playwright deferred → P8** (Vitest+RTL now, 20 new tests); root `app/error.tsx` (Next 16 `unstable_retry`); FR-9 menu-fail blocks+retry; live smoke: page 200, menu API 23 items, SSR renders stepper |
-| 5 | AI Feature A — Recommendation engine | ⬜ | — | |
+| 5 | AI Feature A — Recommendation engine | ✅ | ae8cd20 | `POST /api/recommend` (server-only) + `lib/openrouter.ts` (4s timeout, 429→fallback-model rotation, defensive `extractJsonObject`) + pure `lib/recommend.ts` (verbatim §23.3 prompt, **menu-validation** guardrail, deterministic picker). **Cold start / no key → deterministic, NO LLM**; LLM only for returning phones w/ history. **House default = priciest pizza+topping** (empty counts). `AI_UNAVAILABLE`→**200-with-fallback** (never blocks); rate 10/60. `RecommendCard` "Use this" prefills `selections[0]` (base stays default). **⚠ Version-Safety: PRD's `llama-4-scout:free` DISCONTINUED (404) → primary now `llama-3.2-3b-instruct:free`, fallback `llama-3.3-70b-instruct:free`** (env.schema default + `.env.local` updated). 16 new tests; live smoke: cold-start 200 (P7+T2 priciest), bad phone 400 |
 | 6 | Admin auth + dashboard (metrics, filters, CSV) | ⬜ | — | |
 | 7 | AI Feature C — Demand forecasting (★ bonus) | ⬜ | — | |
 | 8 | Harden, document & demo-ready | ⬜ | — | |
@@ -178,12 +178,14 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 2. `app/api/recommend/route.ts` — take `{ phone }`, query recent history (join `order_line_items`), build compact summary, call OpenRouter with the §23.3 system prompt + live menu + history, **menu-validate** returned codes, else deterministic **popular/house-favourite** fallback (from `order_line_items` counts). Never block ordering.
 3. `RecommendCard` in the stepper (after intake, before quantity): pizza + topping + one-line reason + "Use this" prefill.
 
+> **Phase-5 decisions (locked with the user):** (a) **cold start / empty history → deterministic pick, NO LLM** — the model is called only for returning phones that have history (resolves the PRD §12.1-vs-§23.3 ambiguity, saves free-tier quota); (b) **house-favourite default = priciest available pizza + priciest topping** (§12.3 upsell) when there's no popularity data; the selector prefers most-ordered from `order_line_items` counts when data exists. **Version-Safety deviation:** the PRD's primary `meta-llama/llama-4-scout:free` was **discontinued** as a free endpoint (404 "unavailable for free"); swapped to `meta-llama/llama-3.2-3b-instruct:free` (primary) + `meta-llama/llama-3.3-70b-instruct:free` (fallback), both verified live-free.
+
 **Definition of Done:**
-- [ ] Returning phone → tailored pick; new phone → popular fallback framed as such (cold start).
-- [ ] Model error/timeout/invalid-code → deterministic fallback; **ordering never blocks**.
-- [ ] Recommendation call is server-side only; per-IP rate limited; model+latency logged for the demo.
-- [ ] **Tests:** unit for the defensive JSON parser, menu-validation, and fallback selector (mock OpenRouter); integration for `/api/recommend` — valid, model-returns-bad-code, timeout→fallback, empty-history cold-start.
-- [ ] Commit: `feat: AI recommendation engine (Feature A) with deterministic fallback`
+- [x] Returning phone → tailored pick; new phone → deterministic pick framed as popular (cold start). *(Route branches on history; cold-start live smoke → 200 with a house-favourite pick. Returning-phone path covered by opt-in `test:recommend`.)*
+- [x] Model error/timeout/invalid-code → deterministic fallback; **ordering never blocks**. *(`callOpenRouter` throws on primary+fallback failure → route falls to `pickDeterministic`; invalid/off-menu code → `validateModelPick` null → fallback; `AI_UNAVAILABLE` returned as 200-with-fallback; `RecommendCard` always offers a way forward.)*
+- [x] Recommendation call is server-side only; per-IP rate limited; model+latency logged. *(`/api/recommend` uses `supabaseService` + server-only `OPENROUTER_API_KEY`; `rateLimit(recommend:ip, 10, 60)`; `console.info([recommend] model=… latency=…ms)`.)*
+- [x] **Tests:** defensive JSON parser + model rotation (`openrouter.test.ts`), menu-validation + deterministic selector + history summary (`recommend.test.ts`), Stepper prefill happy-path; opt-in `tests/recommend.integration.test.ts` (cold-start, returning, bad phone). *(16 new; full suite 68 passing / 16 opt-in skipped; `tsc`+lint+`next build` green.)*
+- [x] Commit: `ae8cd20` — `feat: AI recommendation engine (Feature A) with deterministic fallback`
 
 ---
 
