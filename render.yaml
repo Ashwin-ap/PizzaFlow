@@ -1,0 +1,24 @@
+# Render Blueprint (Infrastructure-as-Code) for the SliceMatic forecast service (Feature C).
+# Use: Render Dashboard → New → Blueprint → select this repo. Or configure a Web Service
+# manually with Root Directory = forecast-service and the build/start commands below.
+# Placed at the repo root because Render only auto-detects a Blueprint there; `rootDir`
+# scopes it to the Python service.
+services:
+  - type: web
+    name: slicematic-forecast
+    runtime: python
+    plan: free
+    rootDir: forecast-service
+    region: singapore # set to the region nearest your Supabase project
+    healthCheckPath: /health
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: SUPABASE_URL
+        sync: false # set as a secret in the Render dashboard
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: FORECAST_SERVICE_TOKEN
+        sync: false

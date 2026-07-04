@@ -4,8 +4,8 @@ import { env } from "@/lib/env";
 
 // POST /api/cron/forecast (PRD §11.3, §13.2) — cron-secret guarded. Triggers the Python
 // forecast service's /train, which retrains and writes demand_forecasts. Wired to Vercel
-// Cron (daily) in Phase 8; runnable locally against a uvicorn instance. This route never
-// runs Python itself — it's a thin, authenticated trigger.
+// Cron (daily) via vercel.json; runnable locally against a uvicorn instance. This route
+// never runs Python itself — it's a thin, authenticated trigger.
 export const dynamic = "force-dynamic";
 
 /** Constant-time compare via fixed-length SHA-256 digests (timingSafeEqual needs equal length). */
@@ -15,12 +15,22 @@ function secretMatches(provided: string, expected: string): boolean {
   return timingSafeEqual(a, b);
 }
 
+/**
+ * The secret presented by the caller. Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`
+ * (when CRON_SECRET is set) — that's the primary path in production. `x-cron-secret` is kept
+ * as a manual/PRD-compliant fallback (curl, other schedulers).
+ */
+function presentedSecret(request: Request): string {
+  const authz = request.headers.get("authorization") ?? "";
+  if (authz.startsWith("Bearer ")) return authz.slice(7).trim();
+  return request.headers.get("x-cron-secret") ?? "";
+}
+
 export async function POST(request: Request) {
   try {
     if (!env.CRON_SECRET) return err("INTERNAL", "Cron is not configured.");
 
-    const provided = request.headers.get("x-cron-secret") ?? "";
-    if (!secretMatches(provided, env.CRON_SECRET)) {
+    if (!secretMatches(presentedSecret(request), env.CRON_SECRET)) {
       return err("UNAUTHENTICATED", "Invalid cron secret.");
     }
 

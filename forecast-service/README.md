@@ -32,8 +32,22 @@ curl -X POST localhost:8000/train -H "x-forecast-token: <FORECAST_SERVICE_TOKEN>
 pytest        # DB-free unit tests for the model pipeline
 ```
 
-## Deploy (Phase 8)
+## Deploy (Render)
 
-Deploy to Render/Railway free tier, set the three env vars, hit `/train` once to populate
-`demand_forecasts`, and wire Vercel Cron → `POST /api/cron/forecast` (daily). Note free-tier
-cold starts — warm it before a demo.
+The repo ships a Render Blueprint at `../render.yaml`. Either:
+
+- **Blueprint:** Render Dashboard → New → Blueprint → pick this repo. It provisions a free Web
+  Service rooted at `forecast-service/` with the commands below and empty secret env vars.
+- **Manual:** New → Web Service → Root Directory `forecast-service`, Runtime Python, then:
+  - Build:  `pip install -r requirements.txt`
+  - Start:  `uvicorn app:app --host 0.0.0.0 --port $PORT`  ← must bind `0.0.0.0` and read `$PORT`
+  - Health check path: `/health`
+
+Set env vars (secrets): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `FORECAST_SERVICE_TOKEN`
+(the last must equal the web app's `FORECAST_SERVICE_TOKEN`). Pin `PYTHON_VERSION=3.12`.
+
+After deploy: hit `/train` once to populate `demand_forecasts`, then set the web app's
+`FORECAST_SERVICE_URL` to the Render URL. The daily retrain is wired via `web/vercel.json`
+(`POST /api/cron/forecast`, guarded by `CRON_SECRET`). No CORS is needed — the service is only
+ever called server-to-server (the cron route → `/train`), never from a browser. Note free-tier
+cold starts: warm the service before a demo.

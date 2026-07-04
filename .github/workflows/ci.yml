@@ -35,6 +35,16 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Build (production)
+        run: npm run build
+        env:
+          # Placeholder values so env validation passes at build time — the build compiles
+          # code and never connects to Supabase/OpenRouter. Real values live in Vercel.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: build-placeholder
+          SUPABASE_SECRET_KEY: build-placeholder
+          NEXT_PUBLIC_APP_URL: https://slicematic.example
+
       - name: Audit (high+)
         run: npm audit --audit-level=high
 

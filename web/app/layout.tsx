@@ -17,6 +17,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  // Absolute base for OG/canonical URLs. Sourced from the validated NEXT_PUBLIC_APP_URL
+  // (set in Vercel to the public URL); falls back to localhost for dev/build.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: "SliceMatic — Pizza Ordering",
   description:
     "SliceMatic Stage 3 — fast pizza ordering. Built on Next.js 16 + Supabase.",

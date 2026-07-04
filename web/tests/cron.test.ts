@@ -1,8 +1,9 @@
 // @vitest-environment node
 //
 // Unit test for POST /api/cron/forecast. Runs in CI (no DB needed): the env is stubbed and
-// the outbound fetch to the forecast service is mocked. Verifies the cron-secret gate and
-// that a valid call proxies to the service's /train.
+// the outbound fetch to the forecast service is mocked. Verifies the cron-secret gate — for
+// BOTH the Vercel Cron path (`Authorization: Bearer <CRON_SECRET>`) and the manual
+// `x-cron-secret` fallback — and that a valid call proxies to the service's /train.
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 
 // The route imports the validated env singleton, which parses at import time — populate it
@@ -20,11 +21,12 @@ const CRON_SECRET = "test-cron-secret";
 describe("POST /api/cron/forecast", () => {
   let POST: (req: Request) => Promise<Response>;
 
-  const req = (secret?: string) =>
-    new Request("http://localhost/api/cron/forecast", {
-      method: "POST",
-      headers: secret ? { "x-cron-secret": secret } : {},
-    });
+  const req = (headers: Record<string, string> = {}) =>
+    new Request("http://localhost/api/cron/forecast", { method: "POST", headers });
+  const bearer = (secret: string) => req({ authorization: `Bearer ${secret}` });
+
+  const okFetch = (summary: unknown) =>
+    vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => summary }));
 
   beforeAll(async () => {
     ({ POST } = await import("@/app/api/cron/forecast/route"));
@@ -32,7 +34,7 @@ describe("POST /api/cron/forecast", () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
-  it("rejects a missing cron secret with 401 and never calls the service", async () => {
+  it("rejects a missing secret with 401 and never calls the service", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const res = await POST(req());
@@ -41,22 +43,20 @@ describe("POST /api/cron/forecast", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("rejects a wrong cron secret with 401", async () => {
+  it("rejects a wrong Bearer secret with 401", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    const res = await POST(req("wrong-secret"));
+    const res = await POST(bearer("wrong-secret"));
     expect(res.status).toBe(401);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("proxies to the forecast service /train on a valid secret", async () => {
+  it("accepts the Vercel Cron `Authorization: Bearer` header and proxies to /train", async () => {
     const summary = { model: "rf-v1", rfRmse: 1.2, linRmse: 1.8, rowsWritten: 84 };
-    const fetchSpy = vi.fn(() =>
-      Promise.resolve({ ok: true, status: 200, json: async () => summary }),
-    );
+    const fetchSpy = okFetch(summary);
     vi.stubGlobal("fetch", fetchSpy);
 
-    const res = await POST(req(CRON_SECRET));
+    const res = await POST(bearer(CRON_SECRET));
     expect(res.status).toBe(200);
     const { success, data } = await res.json();
     expect(success).toBe(true);
@@ -69,9 +69,17 @@ describe("POST /api/cron/forecast", () => {
     expect((init.headers as Record<string, string>)["x-forecast-token"]).toBe("test-forecast-token");
   });
 
+  it("also accepts the manual `x-cron-secret` fallback header", async () => {
+    const fetchSpy = okFetch({ model: "rf-v1", rowsWritten: 84 });
+    vi.stubGlobal("fetch", fetchSpy);
+    const res = await POST(req({ "x-cron-secret": CRON_SECRET }));
+    expect(res.status).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("returns 500 when the service responds non-OK", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) })));
-    const res = await POST(req(CRON_SECRET));
+    const res = await POST(bearer(CRON_SECRET));
     expect(res.status).toBe(500);
     expect((await res.json()).error.code).toBe("INTERNAL");
   });
