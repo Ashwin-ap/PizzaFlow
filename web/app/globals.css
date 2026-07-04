@@ -196,6 +196,15 @@
     border-color: var(--color-primary);
   }
 
+  /* Inline field/validation error (PRD §10.2/§10.3 — announced via aria-live). */
+  .field-error {
+    display: block;
+    font-size: 13px;
+    line-height: 1.3;
+    color: var(--color-ruby);
+    margin-top: 2px;
+  }
+
   /* Soft badge */
   .tag-soft {
     display: inline-flex;

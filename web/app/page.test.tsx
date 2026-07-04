@@ -3,17 +3,18 @@ import { render, screen } from "@testing-library/react";
 import Home from "./page";
 
 beforeEach(() => {
-  // StatusChips pings /api/health + /api/ready on mount.
+  // The Stepper fetches /api/menu on mount. Keep it pending so the flow stays on
+  // the intake step (menuLoading) and the smoke assertion is deterministic.
   vi.stubGlobal(
     "fetch",
-    vi.fn(() => Promise.resolve({ ok: true } as Response)),
+    vi.fn(() => new Promise<Response>(() => {})),
   );
 });
 
-describe("landing page", () => {
-  it("renders the branded hero without throwing", () => {
+describe("home page (customer ordering flow)", () => {
+  it("mounts the ordering stepper on the intake step", () => {
     render(<Home />);
-    expect(screen.getByText(/Pizza ordering/i)).toBeInTheDocument();
-    expect(screen.getByText(/Stage 3 · SliceMatic/i)).toBeInTheDocument();
+    expect(screen.getByText(/Who's ordering/)).toBeInTheDocument();
+    expect(screen.getByText(/1\. Details/)).toBeInTheDocument();
   });
 });
