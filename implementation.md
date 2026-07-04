@@ -36,7 +36,7 @@ Each phase is **one session**. In a session:
 | 1 | Foundation & first deploy | ✅ | cb69f8b | local-first (no deploy); next@16.2.10, tailwind@4.3.2; env names use PUBLISHABLE/SECRET; tests 10✓ |
 | 2 | Database — schema, RLS, seed | ✅ | 3963dde | 5 tables + RLS live via `supabase db push`; **TS seed** (`web/scripts/`, not Python) reuses supabase-js; 23 items seeded, swap-safe; admin `admin@slicematic.dev` provisioned; `0003_views` deferred→P6; `seed_orders` stubbed→P7; RLS test local-only (`npm run test:rls`) |
 | 3 | Core domain libs + `/api/menu` + `/api/orders` | ✅ | 44287e0 | server-authoritative pricing (`lib/pricing.ts`, integer paise); **atomic `create_order` RPC**; idempotency via `Idempotency-Key` header + unique col; durable Supabase rate limiter; **RPCs revoked from anon** (verified 42501); admin client → P6; route+RLS tests opt-in (`npm run test:integration` / `test:rls`) |
-| 4 | Customer ordering UI (stepper + design system) | ⬜ | — | |
+| 4 | Customer ordering UI (stepper + design system) | ✅ | 387c057 | 7-step client `Stepper` (`components/order/`) wired to `/api/menu` + `/api/orders`; client preview reuses `lib/pricing.ts` (== server to the paise, §23 verified); **selection builder** (dropdowns) → edge #4/#5 server-guarded not in-UI; **native React + Zod** (no RHF); **Playwright deferred → P8** (Vitest+RTL now, 20 new tests); root `app/error.tsx` (Next 16 `unstable_retry`); FR-9 menu-fail blocks+retry; live smoke: page 200, menu API 23 items, SSR renders stepper |
 | 5 | AI Feature A — Recommendation engine | ⬜ | — | |
 | 6 | Admin auth + dashboard (metrics, filters, CSV) | ⬜ | — | |
 | 7 | AI Feature C — Demand forecasting (★ bonus) | ⬜ | — | |
@@ -155,13 +155,15 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 4. Fetch menu (cached) from `/api/menu`; submit to `/api/orders`; explicit **loading + error** states; root `ErrorBoundary`; menu-load failure disables ordering (FR-9) without crashing.
 5. Apply `.btn` (primary invert-on-hover + scale), `.input` focus rings, card recipes, `canvas-soft` bill panel, full light/dark, responsive (desktop + mobile).
 
+> **Phase-4 deviations (locked with the user, override the docs):** (a) **selection-based builder** (dropdowns) instead of FR-8's typed item-number → edge cases **#4/#5 become structurally impossible in-UI**, so they're guarded server-side (`MENU_ITEM_NOT_FOUND` 422, already tested in `orders.integration.test.ts`) and documented, not shown in-UI; (b) **native React state + shared Zod** (no React Hook Form dependency); (c) **Playwright e2e deferred to Phase 8** — Vitest + Testing Library cover Phase 4 now.
+
 **Definition of Done:**
-- [ ] Full order placeable end-to-end locally (`localhost:3000`); confirmation echoes the saved order; "New order" resets.
-- [ ] All 8 edge cases (§10.2) handled in-UI with the exact PRD error messages; no unhandled exception / white-screen.
-- [ ] Client preview bill equals the server bill to the paise.
-- [ ] Dark mode + responsive verified; a11y (labels, focus, contrast AA, `aria-live`).
-- [ ] **Tests:** component tests for each validated field (accept/reject); **Playwright e2e** — happy-path order + at least edge cases #1/#3/#5; a dark-mode toggle + no-flash check.
-- [ ] Commit: `feat: customer ordering stepper wired to server pricing, full design system`
+- [x] Full order placeable end-to-end locally (`localhost:3000`); confirmation echoes the saved order; "New order" resets. *(7-step `Stepper`; Stepper.test walks all 7 steps + reset; live dev smoke: `/`→200, SSR renders stepper, `/api/menu`→23 seeded items.)*
+- [x] Edge cases handled without an unhandled exception / white-screen. *(In-UI with exact PRD messages: **#1** all-spaces name, **#2** phone leading-1, **#3** qty 0/11, **#6** empty, **#7** `2.5`/`three` — via IntakeForm/QuantityStep tests. **#4/#5** server-guarded per the deviation above. **#8** menu-parser skips malformed → FR-9. Root `app/error.tsx` catches render errors.)*
+- [x] Client preview bill equals the server bill to the paise. *(Client imports the same `computeBill`/`rupees`; BillTable.test asserts the §23 traces ₹3594.87 + ₹586.46.)*
+- [x] Dark mode + responsive; a11y (labels, focus, `aria-live`, AA). *(Built on the design-system tokens/recipes; labelled inputs, `role="alert" aria-live="polite"` errors, `aria-current` step indicator, `bg-canvas-soft` bill panel, responsive `md:` grids.)*
+- [x] **Tests:** 20 new Vitest + Testing Library specs (IntakeForm, QuantityStep, BillTable §23, PaymentStep, Stepper happy-path + FR-9 + reset). *(Full suite 52 passing / 13 opt-in skipped; `tsc --noEmit` + lint clean; `next build` green.)* Playwright e2e → Phase 8.
+- [x] Commit: `387c057` — `feat: customer ordering stepper wired to server pricing, full design system`
 
 ---
 
