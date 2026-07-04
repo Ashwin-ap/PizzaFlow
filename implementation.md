@@ -32,8 +32,8 @@ Each phase is **one session**. In a session:
 
 | # | Phase | Status | Commit | Notes |
 |---|---|---|---|---|
-| 0 | Prerequisites (accounts, keys, local tooling) | ⬜ | — | one-time setup, not a code session |
-| 1 | Foundation & first deploy | ⬜ | — | |
+| 0 | Prerequisites (accounts, keys, local tooling) | ✅ | — | Supabase `SliceMatic_Grp8` live; CLI logged in; secrets git-ignored; new sb_ keys |
+| 1 | Foundation & first deploy | ✅ | cb69f8b | local-first (no deploy); next@16.2.10, tailwind@4.3.2; env names use PUBLISHABLE/SECRET; tests 10✓ |
 | 2 | Database — schema, RLS, seed | ⬜ | — | |
 | 3 | Core domain libs + `/api/menu` + `/api/orders` | ⬜ | — | |
 | 4 | Customer ordering UI (stepper + design system) | ⬜ | — | |
@@ -61,13 +61,13 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 
 **Goal:** every account, key, and local tool ready so no later phase is blocked. Not a coding session — a checklist.
 
-- [ ] **Accounts:** GitHub (✅ exists), **Supabase** (✅ project `SliceMatic_Grp8` created), **OpenRouter** (✅ key ready), **Vercel** (✅ account exists — used only for the final manual deploy). **Render/Railway** for the forecast service is **deferred** (bonus Phase 7 only).
-- [ ] **OpenRouter:** create an API key; on `openrouter.ai/models` (filter Price → Free) confirm `meta-llama/llama-4-scout:free` + `meta-llama/llama-3.3-70b-instruct:free` are live $0 endpoints (PRD §12.2 — re-verify before submit).
-- [ ] **Local tooling:** Node.js Active LTS (verify), npm, Python 3.11+ (verify), Git, and the **Supabase CLI** (via `npx supabase` — required for the chosen `db push` migration route; run `supabase login`).
-- [ ] **Supabase project:** create it (empty); copy the **bare project URL**, **publishable/anon key**, **secret/service-role key**, and the **DB password** into the git-ignored scratch file `Supabase_OpenRouter_Credentials.txt` (repo root). ⚠️ Use the **bare** URL (`https://<ref>.supabase.co`), not the `/rest/v1/` REST endpoint. These values become `web/.env.local` in Phase 1.
-- [ ] Have the three `Types_of_*.txt` menu files on hand (they are the seed source).
+- [x] **Accounts:** GitHub (✅ exists), **Supabase** (✅ project `SliceMatic_Grp8` created), **OpenRouter** (✅ key ready), **Vercel** (✅ account exists — used only for the final manual deploy). **Render/Railway** for the forecast service is **deferred** (bonus Phase 7 only).
+- [x] **OpenRouter:** create an API key; on `openrouter.ai/models` (filter Price → Free) confirm `meta-llama/llama-4-scout:free` + `meta-llama/llama-3.3-70b-instruct:free` are live $0 endpoints (PRD §12.2 — re-verify before submit). ✓ both confirmed live.
+- [x] **Local tooling:** Node.js **24.14.0** (Active LTS ✓), npm 11.9.0, Python **3.13.7**, Git 2.52, and the **Supabase CLI v2.109.0** (via `npx supabase`) — `supabase login` done (projects list OK).
+- [x] **Supabase project:** created; **bare project URL**, **publishable key**, **secret key**, and **DB password** captured in the git-ignored `Supabase_OpenRouter_Credentials.txt` (bare URL, not the `/rest/v1/` endpoint). Transcribed into `web/.env.local` in Phase 1. *(Admin email/password still to pick — Phase 2, not a Phase 0 blocker.)*
+- [x] Have the three `Types_of_*.txt` menu files on hand (they are the seed source).
 
-**Definition of Done:** all keys captured in the git-ignored `Supabase_OpenRouter_Credentials.txt` (never committed — transcribed into `web/.env.local` in Phase 1), protected by a root `.gitignore`; Supabase project exists; Supabase CLI installed + `supabase login` done; `node -v` / `python --version` confirm supported versions.
+**Definition of Done:** ✅ all keys captured in the git-ignored `Supabase_OpenRouter_Credentials.txt` (never committed — transcribed into `web/.env.local` in Phase 1), protected by a root `.gitignore` (`git check-ignore` verified); Supabase project exists (ACTIVE_HEALTHY); Supabase CLI installed + `supabase login` done; `node -v` / `python --version` confirm supported versions.
 
 ---
 
@@ -80,7 +80,7 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 **Steps:**
 1. Scaffold `web/` — Next.js 16 (App Router, **TypeScript strict**, no `any`), Tailwind **v4**.
 2. Wire the **design system** from PRD §16.2: put all colour/shadow/typography tokens in a Tailwind v4 `@theme{}` block; dark surfaces overridden under `.dark`; `next/font` for Inter + JetBrains Mono; `lucide-react` for icons; the no-flash inline script in `app/layout.tsx` (`<head>`, `suppressHydrationWarning` on `<html>`); a `ThemeToggle` component.
-3. `lib/env.ts` — Zod-validated env (§6), crash on bad config. Create **`web/.env.local`** (git-ignored) by transcribing the values from `Supabase_OpenRouter_Credentials.txt` (bare `NEXT_PUBLIC_SUPABASE_URL`, publishable key, `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`).
+3. `lib/env.ts` — Zod-validated env (§6), crash on bad config. Create **`web/.env.local`** (git-ignored) by transcribing the values from `Supabase_OpenRouter_Credentials.txt` (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `OPENROUTER_API_KEY`). *(Accurate new key names — deviates from PRD's legacy ANON/SERVICE_ROLE naming.)*
 4. `lib/response.ts` — success/error/paginated envelope helpers + the §11.2 error codes.
 5. `app/api/health/route.ts` (200, no DB) and `app/api/ready/route.ts` (light Supabase check → 503 if down).
 6. Repo hygiene: root `.gitignore` + `.cursorignore` (§5), `.github/workflows/ci.yml` (§18 CI gate).
@@ -88,11 +88,11 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 8. **Run & verify locally:** `npm run dev` → confirm the branded shell renders at `localhost:3000`. (No Vercel deploy — that's the single manual step in Phase 8.)
 
 **Definition of Done:**
-- [ ] **`localhost:3000`** renders the branded shell in **light + dark** (no flash), responsive desktop + mobile.
-- [ ] `/api/health` → 200; `/api/ready` → 200 when Supabase reachable.
-- [ ] CI is green; `npm audit` clean; Next.js on patched 16.2.x.
-- [ ] **Tests:** unit for `lib/env.ts` (rejects bad config) and `lib/response.ts` (envelope shapes); a smoke render test for the layout.
-- [ ] Commit: `feat: foundation — next16+tailwind design system, env, health, CI, first deploy (verified next@16.2.x, npm audit clean)`
+- [x] **`localhost:3000`** renders the branded shell in **light + dark** (no flash), responsive desktop + mobile. *(Verified via warning-free build + compiled CSS — `.dark` tokens, `@media`, `.btn/.chip` recipes — and served HTML incl. the no-flash script; a final browser eyeball is recommended.)*
+- [x] `/api/health` → 200; `/api/ready` → 200 when Supabase reachable. *(curl-verified: both 200, envelope-wrapped.)*
+- [ ] CI is green; `npm audit` clean; Next.js on patched 16.2.x. *(Next@16.2.10 ✓; local CI steps — `tsc --noEmit`, `lint`, `test`, `audit --audit-level=high` — all pass ✓. **GitHub Actions CI runs only after the push** → pending. Disclosure: `npm audit` shows **2 moderate** advisories (postcss ← next), below the `high` gate.)*
+- [x] **Tests:** `env.schema` (rejects bad config), `response` (envelope shapes), landing smoke render — **10 passing** (Vitest + happy-dom).
+- [x] Commit: `cb69f8b` — `feat: foundation — next16 + tailwind v4 design system, env, envelope, health/ready, CI`
 
 ---
 
