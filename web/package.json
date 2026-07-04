@@ -13,9 +13,11 @@
     "provision:admin": "node --import tsx --env-file=.env.local scripts/provision-admin.ts",
     "test:rls": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run tests/rls.integration.test.ts",
     "test:integration": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run tests/orders.integration.test.ts",
-    "test:recommend": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run tests/recommend.integration.test.ts"
+    "test:recommend": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run tests/recommend.integration.test.ts",
+    "test:admin": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run tests/admin.integration.test.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
     "lucide-react": "^1.23.0",
     "next": "16.2.10",
