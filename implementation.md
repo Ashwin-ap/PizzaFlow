@@ -34,7 +34,7 @@ Each phase is **one session**. In a session:
 |---|---|---|---|---|
 | 0 | Prerequisites (accounts, keys, local tooling) | ✅ | — | Supabase `SliceMatic_Grp8` live; CLI logged in; secrets git-ignored; new sb_ keys |
 | 1 | Foundation & first deploy | ✅ | cb69f8b | local-first (no deploy); next@16.2.10, tailwind@4.3.2; env names use PUBLISHABLE/SECRET; tests 10✓ |
-| 2 | Database — schema, RLS, seed | ⬜ | — | |
+| 2 | Database — schema, RLS, seed | ✅ | 3963dde | 5 tables + RLS live via `supabase db push`; **TS seed** (`web/scripts/`, not Python) reuses supabase-js; 23 items seeded, swap-safe; admin `admin@slicematic.dev` provisioned; `0003_views` deferred→P6; `seed_orders` stubbed→P7; RLS test local-only (`npm run test:rls`) |
 | 3 | Core domain libs + `/api/menu` + `/api/orders` | ⬜ | — | |
 | 4 | Customer ordering UI (stepper + design system) | ⬜ | — | |
 | 5 | AI Feature A — Recommendation engine | ⬜ | — | |
@@ -90,7 +90,7 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 **Definition of Done:**
 - [x] **`localhost:3000`** renders the branded shell in **light + dark** (no flash), responsive desktop + mobile. *(Verified via warning-free build + compiled CSS — `.dark` tokens, `@media`, `.btn/.chip` recipes — and served HTML incl. the no-flash script; a final browser eyeball is recommended.)*
 - [x] `/api/health` → 200; `/api/ready` → 200 when Supabase reachable. *(curl-verified: both 200, envelope-wrapped.)*
-- [ ] CI is green; `npm audit` clean; Next.js on patched 16.2.x. *(Next@16.2.10 ✓; local CI steps — `tsc --noEmit`, `lint`, `test`, `audit --audit-level=high` — all pass ✓. **GitHub Actions CI runs only after the push** → pending. Disclosure: `npm audit` shows **2 moderate** advisories (postcss ← next), below the `high` gate.)*
+- [x] CI is green; `npm audit` clean; Next.js on patched 16.2.x. *(Next@16.2.10 ✓; **GitHub Actions CI passed on `23950ca` — Success in ~37s**. `npm audit` clean at the `--audit-level=high` gate; 2 moderate postcss advisories remain below it.)*
 - [x] **Tests:** `env.schema` (rejects bad config), `response` (envelope shapes), landing smoke render — **10 passing** (Vitest + happy-dom).
 - [x] Commit: `cb69f8b` — `feat: foundation — next16 + tailwind v4 design system, env, envelope, health/ready, CI`
 
@@ -111,11 +111,11 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 6. Apply migrations + `seed_menu.py` to the Supabase project. Create the **grader admin auth user** and insert its `admin_users` row.
 
 **Definition of Done:**
-- [ ] All 5 tables exist with constraints; RLS **enabled on every table**.
-- [ ] Anon key can read available `menu_items`; anon **cannot** read `orders` (verify with a non-admin query).
-- [ ] `seed_menu.py` is idempotent and swap-safe (re-run against altered files re-seeds cleanly).
-- [ ] **Tests:** an integration test asserting RLS (anon reads menu OK, anon reads orders DENIED) and seed idempotency (re-run → same row count).
-- [ ] Commit: `feat: supabase schema + RLS + is_admin + swap-safe menu seed`
+- [x] All 5 tables exist with constraints; RLS **enabled on every table**. *(0001/0002 pushed; `menu_items, orders, order_line_items, demand_forecasts, admin_users` all live with RLS.)*
+- [x] Anon key can read available `menu_items`; anon **cannot** read `orders` (verify with a non-admin query). *(RLS test: anon reads 23 menu items; anon read of `orders` → 0 rows; anon insert → denied.)*
+- [x] Seed is idempotent and swap-safe (re-run against altered files re-seeds cleanly). *(Implemented as **TS** `web/scripts/seed-menu.ts` — upsert on `(category, code)`, missing codes deactivated not deleted; re-run → same count.)*
+- [x] **Tests:** an integration test asserting RLS (anon reads menu OK, anon reads orders DENIED) and seed idempotency (re-run → same row count). *(`web/tests/rls.integration.test.ts` — 4 tests, opt-in `npm run test:rls`, skipped in CI without creds; parser unit tests 7 run in CI.)*
+- [x] Commit: `3963dde` — `feat: supabase schema + RLS + is_admin + swap-safe menu seed`
 
 ---
 
