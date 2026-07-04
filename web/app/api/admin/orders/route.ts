@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { paginated, err } from "@/lib/response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { adminOrdersQuery, paramsToObject } from "@/lib/admin-query";
+import { SYNTHETIC_PHONE_LIKE } from "@/lib/synthetic";
 
 // GET /api/admin/orders (PRD §11.3) — admin only. Date + payment filters, pagination.
 // Read through the caller's user-scoped client so RLS (is_admin) enforces access too.
@@ -22,6 +23,8 @@ export async function GET(request: Request) {
     let q = supabase
       .from("orders")
       .select("*, order_line_items(*)", { count: "exact" })
+      // Exclude synthetic forecast-seed orders (phone prefix); count stays accurate.
+      .not("customer_phone", "like", SYNTHETIC_PHONE_LIKE)
       .order("placed_at", { ascending: false });
     if (from) q = q.gte("placed_at", from);
     if (to) q = q.lt("placed_at", to);

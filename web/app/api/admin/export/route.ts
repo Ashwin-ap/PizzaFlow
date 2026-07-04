@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { err } from "@/lib/response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { adminExportQuery, paramsToObject } from "@/lib/admin-query";
+import { SYNTHETIC_PHONE_LIKE } from "@/lib/synthetic";
 import { ordersToCsv, type OrderCsvRow } from "@/lib/csv";
 
 // GET /api/admin/export (PRD §11.3, §17) — admin only. Streams the filtered orders as
@@ -26,6 +27,8 @@ export async function GET(request: Request) {
       .select(
         "id, placed_at, customer_name, customer_phone, quantity, subtotal_paise, discount_paise, gst_paise, total_paise, payment_mode",
       )
+      // Exclude synthetic forecast-seed orders (phone prefix) from the export.
+      .not("customer_phone", "like", SYNTHETIC_PHONE_LIKE)
       .order("placed_at", { ascending: false });
     if (from) q = q.gte("placed_at", from);
     if (to) q = q.lt("placed_at", to);

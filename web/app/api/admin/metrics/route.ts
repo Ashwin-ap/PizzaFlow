@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ok, err } from "@/lib/response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { adminMetricsQuery, paramsToObject } from "@/lib/admin-query";
+import { SYNTHETIC_PHONE_LIKE } from "@/lib/synthetic";
 import {
   computeRevenuePaise,
   topSellingPizza,
@@ -34,7 +35,9 @@ export async function GET(request: Request) {
 
     let q = supabase
       .from("orders")
-      .select("total_paise, placed_at, order_line_items(pizza_name)");
+      .select("total_paise, placed_at, order_line_items(pizza_name)")
+      // Exclude synthetic forecast-seed orders (phone prefix) — the tiles stay honest.
+      .not("customer_phone", "like", SYNTHETIC_PHONE_LIKE);
     if (from) q = q.gte("placed_at", from);
     if (to) q = q.lt("placed_at", to);
     if (payment) q = q.eq("payment_mode", payment);

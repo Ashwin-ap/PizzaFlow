@@ -7,13 +7,16 @@ import { createBrowserSupabase } from "@/lib/supabase/browser-ssr";
 import {
   fetchAdminMetrics,
   fetchAdminOrders,
+  fetchForecast,
   AdminUnauthorizedError,
   type AdminFilter,
+  type AdminForecast,
   type AdminMetrics,
   type AdminOrder,
   type Pagination,
 } from "@/lib/admin-api";
 import { MetricCards } from "./MetricCards";
+import { ForecastChart } from "./ForecastChart";
 import { FilterBar } from "./FilterBar";
 import { OrdersTable } from "./OrdersTable";
 import { ExportButton } from "./ExportButton";
@@ -35,6 +38,8 @@ export function Dashboard({ adminEmail }: { adminEmail: string }) {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [forecast, setForecast] = useState<AdminForecast | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,6 +67,31 @@ export function Dashboard({ adminEmail }: { adminEmail: string }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+
+  // Forecast is filter-independent (always the next 7 days) — load it once on mount, in its
+  // own path so a forecast failure never blanks the metrics/orders dashboard.
+  useEffect(() => {
+    let alive = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setForecastLoading(true);
+    fetchForecast()
+      .then((f) => {
+        if (alive) setForecast(f);
+      })
+      .catch((e) => {
+        if (e instanceof AdminUnauthorizedError) {
+          router.push("/admin/login");
+          return;
+        }
+        console.error("forecast load failed:", e);
+      })
+      .finally(() => {
+        if (alive) setForecastLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [router]);
 
   async function signOut() {
     await createBrowserSupabase().auth.signOut();
@@ -104,6 +134,8 @@ export function Dashboard({ adminEmail }: { adminEmail: string }) {
       )}
 
       <MetricCards metrics={metrics} loading={loading} />
+
+      <ForecastChart forecast={forecast} loading={forecastLoading} />
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-ink">Orders</h2>

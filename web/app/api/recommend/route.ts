@@ -68,7 +68,10 @@ export async function POST(request: Request) {
     const menu: MenuLite = { pizzas, toppings };
     const idToItem = new Map(rows.map((r) => [r.id, r]));
 
-    // 4) Global popularity counts (keyed by current menu code).
+    // 4) Global popularity counts (keyed by current menu code). Synthetic forecast-seed
+    // orders (phone prefix "9990") carry NO order_line_items, so they never pollute these
+    // counts — the exclusion is by construction. If synthetic line items are ever added,
+    // filter them here (join orders, drop isSyntheticPhone) to keep this honest.
     const counts: Counts = { pizza: {}, topping: {} };
     const { data: liData } = await supabaseService
       .from("order_line_items")

@@ -37,3 +37,25 @@ jobs:
 
       - name: Audit (high+)
         run: npm audit --audit-level=high
+
+  forecast:
+    name: forecast-service (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: forecast-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: forecast-service/requirements.txt
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Test (model logic — no DB)
+        run: pytest -q
