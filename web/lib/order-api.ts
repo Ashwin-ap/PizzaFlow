@@ -42,6 +42,15 @@ export interface OrderRequest {
   lineItems: OrderLineItem[];
 }
 
+/** AI recommendation (Feature A) — pizza + topping only, never a base (PRD §12/§23.3). */
+export interface Recommendation {
+  pizzaCode: string;
+  toppingCode: string;
+  pizzaName: string;
+  toppingName: string;
+  reason: string;
+}
+
 /** The persisted order row returned by the create_order RPC (opaque to the UI). */
 export type PersistedOrder = Record<string, unknown>;
 
@@ -89,6 +98,26 @@ export async function fetchMenu(): Promise<Result<Menu>> {
     return await parseEnvelope<Menu>(res);
   } catch {
     return { ok: false, code: "NETWORK", message: "Couldn't reach the menu. Check your connection and retry." };
+  }
+}
+
+/**
+ * Fetch an AI recommendation for a phone (FR-4). The server always answers with a
+ * pick (deterministic fallback on any model failure), so a non-ok here is only a
+ * transport/rate-limit issue — the caller just proceeds without a suggestion.
+ */
+export async function fetchRecommendation(
+  phone: string,
+): Promise<Result<{ recommendation: Recommendation }>> {
+  try {
+    const res = await fetch("/api/recommend", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ phone }),
+    });
+    return await parseEnvelope<{ recommendation: Recommendation }>(res);
+  } catch {
+    return { ok: false, code: "NETWORK", message: "Couldn't load a recommendation." };
   }
 }
 

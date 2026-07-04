@@ -13,7 +13,9 @@ describe("envSchema", () => {
     const r = envSchema.safeParse(valid);
     expect(r.success).toBe(true);
     if (r.success) {
-      expect(r.data.OPENROUTER_MODEL).toBe("meta-llama/llama-4-scout:free");
+      // Scout :free was discontinued upstream → primary is now llama-3.2-3b:free.
+      expect(r.data.OPENROUTER_MODEL).toBe("meta-llama/llama-3.2-3b-instruct:free");
+      expect(r.data.OPENROUTER_MODEL).toContain(":free");
       expect(r.data.OPENROUTER_FALLBACK_MODEL).toContain(":free");
     }
   });

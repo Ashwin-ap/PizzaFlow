@@ -11,6 +11,7 @@ import {
   type OrderLineItem,
   type OrderResult,
   type PaymentMode,
+  type Recommendation,
 } from "@/lib/order-api";
 import { IntakeForm } from "./IntakeForm";
 import { RecommendCard } from "./RecommendCard";
@@ -46,6 +47,11 @@ export function Stepper() {
   const [quantity, setQuantity] = useState<number | null>(null);
   const [selections, setSelections] = useState<OrderLineItem[]>([]);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("Cash");
+
+  // AI recommendation (Feature A): cached so re-entry doesn't refetch; `prefill`
+  // carries an accepted pick into the first builder row.
+  const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
+  const [prefill, setPrefill] = useState<{ pizzaCode: string; toppingCode: string } | null>(null);
 
   const [menu, setMenu] = useState<Menu | null>(null);
   const [menuLoading, setMenuLoading] = useState(true);
@@ -85,14 +91,22 @@ export function Stepper() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelections((prev) => {
       if (prev.length === quantity) return prev;
-      const def: OrderLineItem = {
+      // Row 0 honours an accepted recommendation (pizza + topping only — base stays
+      // the default); guard each prefilled code against the live menu (swap-safety).
+      const build = (i: number): OrderLineItem => ({
         baseCode: menu.bases[0].code,
-        pizzaCode: menu.pizzas[0].code,
-        toppingCode: menu.toppings[0].code,
-      };
-      return Array.from({ length: quantity }, (_, i) => prev[i] ?? def);
+        pizzaCode:
+          i === 0 && prefill && find(menu.pizzas, prefill.pizzaCode)
+            ? prefill.pizzaCode
+            : menu.pizzas[0].code,
+        toppingCode:
+          i === 0 && prefill && find(menu.toppings, prefill.toppingCode)
+            ? prefill.toppingCode
+            : menu.toppings[0].code,
+      });
+      return Array.from({ length: quantity }, (_, i) => prev[i] ?? build(i));
     });
-  }, [step, menu, quantity]);
+  }, [step, menu, quantity, prefill]);
 
   const previewBill =
     menu && selections.length > 0
@@ -112,6 +126,8 @@ export function Stepper() {
     setQuantity(null);
     setSelections([]);
     setPaymentMode("Cash");
+    setRecommendation(null);
+    setPrefill(null);
     setSubmitError(null);
     setResult(null);
   }
@@ -175,7 +191,18 @@ export function Stepper() {
             />
           )}
 
-          {step === "recommend" && <RecommendCard onContinue={() => setStep("quantity")} />}
+          {step === "recommend" && (
+            <RecommendCard
+              phone={customer.phone}
+              cached={recommendation}
+              onFetched={setRecommendation}
+              onUseThis={(rec) => {
+                setPrefill({ pizzaCode: rec.pizzaCode, toppingCode: rec.toppingCode });
+                setStep("quantity");
+              }}
+              onSkip={() => setStep("quantity")}
+            />
+          )}
 
           {step === "quantity" && (
             <QuantityStep

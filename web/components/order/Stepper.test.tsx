@@ -26,6 +26,14 @@ const jsonRes = (status: number, body: unknown) => ({
   json: () => Promise.resolve(body),
 });
 
+const RECOMMENDATION = {
+  pizzaCode: "P1",
+  toppingCode: "T1",
+  pizzaName: "Margherita",
+  toppingName: "Black Olives",
+  reason: "A crowd favourite to get you started.",
+};
+
 function mockFetch(menuOk = true) {
   return vi.fn((url: string) => {
     if (String(url).includes("/api/menu")) {
@@ -34,6 +42,9 @@ function mockFetch(menuOk = true) {
           ? jsonRes(200, { success: true, data: MENU })
           : jsonRes(500, { success: false, error: { code: "INTERNAL", message: "Failed to load menu" } }),
       );
+    }
+    if (String(url).includes("/api/recommend")) {
+      return Promise.resolve(jsonRes(200, { success: true, data: { recommendation: RECOMMENDATION } }));
     }
     // POST /api/orders
     return Promise.resolve(
@@ -61,8 +72,9 @@ describe("Stepper — end to end", () => {
     await user.type(screen.getByLabelText("Phone"), "9876543210");
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
-    // 2) Recommendation (placeholder, non-blocking)
-    await user.click(await screen.findByRole("button", { name: "Continue" }));
+    // 2) Recommendation — accept the pick (prefills builder row 1)
+    expect(await screen.findByText(/Margherita/)).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Use this" }));
 
     // 3) Quantity
     await user.type(screen.getByLabelText("Number of pizzas"), "1");

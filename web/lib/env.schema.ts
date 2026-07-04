@@ -16,9 +16,13 @@ export const envSchema = z.object({
   // App
   NEXT_PUBLIC_APP_URL: z.url(),
 
-  // OpenRouter (Phase 5) — optional until then; slugs default to :free models
+  // OpenRouter (Phase 5) — optional until then; slugs default to live :free models.
+  // NOTE: the PRD's meta-llama/llama-4-scout:free was DISCONTINUED as a free endpoint
+  // (404 "unavailable for free"), so the primary is now llama-3.2-3b-instruct:free
+  // (small/fast, low-latency on the ordering path); fallback stays llama-3.3-70b.
+  // Re-verify both slugs are live before submit (PRD §12.2 Version-Safety Rule).
   OPENROUTER_API_KEY: z.string().min(1).optional(),
-  OPENROUTER_MODEL: z.string().min(1).default("meta-llama/llama-4-scout:free"),
+  OPENROUTER_MODEL: z.string().min(1).default("meta-llama/llama-3.2-3b-instruct:free"),
   OPENROUTER_FALLBACK_MODEL: z
     .string()
     .min(1)
