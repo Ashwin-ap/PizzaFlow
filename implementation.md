@@ -5,6 +5,10 @@
 > **Goal:** ship the full Stage 3 system and earn the complete **50 pts + 10 bonus** (see the Rubric Map at the bottom).
 >
 > **Stack is locked** (PRD §4): Next.js 16 App Router · Supabase (Postgres + Auth) · OpenRouter (`:free` model) · Python/scikit-learn forecast service · Vercel. Test tooling (Vitest, Playwright, pytest) is **dev-only** and does not change the runtime stack. Verify every dependency version live per the PRD's **Version Safety Rule** before writing any manifest.
+>
+> **Deployment model — local-first (project decision):** every phase is built and verified on **`localhost`** (`npm run dev` + the phase's tests). We do **not** deploy to Vercel during development. A single **manual** Vercel deploy is done by the developer from the GitHub repo at the very end (Phase 8). This changes only *where you verify* (local, not a live URL) — it does **not** relax any testing, validation, or Definition-of-Done item.
+>
+> **Credentials/env flow:** the raw keys live in a git-ignored scratch file **`Supabase_OpenRouter_Credentials.txt`** (repo root). In Phase 1 they are transcribed into **`web/.env.local`** (also git-ignored — this is the real `.env` for local dev). At the final manual deploy they are pasted into the **Vercel dashboard** env vars. The `.txt` and every `.env*` file are **never committed**.
 
 ---
 
@@ -15,8 +19,8 @@ Each phase is **one session**. In a session:
 1. **Read** `implementation.md` (this file) + `PizzaFlow_Stage3_PRD.md`.
 2. **Pick** the first phase whose status is ⬜ in the Progress Tracker (do them in order — later phases depend on earlier ones).
 3. **Implement** only that phase. Follow its *Steps*, build against the referenced PRD sections.
-4. **Verify** — make every item in that phase's *Definition of Done* pass, including its automated tests (`npm test` / `pytest`) and the live-deploy smoke check.
-5. **Commit & push** a focused commit (the phase's suggested message), then **redeploy** (deploy-early model — every phase after Phase 1 ships to the live URL).
+4. **Verify** — make every item in that phase's *Definition of Done* pass, including its automated tests (`npm test` / `pytest`) and a **local** smoke check (`localhost:3000`).
+5. **Commit & push** a focused commit (the phase's suggested message) to `origin/main`. **No Vercel redeploy** — per the local-first model, the live deploy happens once, manually, in Phase 8.
 6. **Update the tracker** — set the phase to ✅ and paste the commit short-hash. Add a one-line "notes / gotchas" for the next session if anything is non-obvious.
 7. **Exit** the session.
 
@@ -46,10 +50,10 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 
 - **Version Safety** (PRD top): before editing `package.json` / `requirements.txt`, `npm show <pkg> version` + a CVE search; Node = current Active LTS; Next.js = patched **16.2.x**; OpenRouter slug must carry the `:free` suffix. State what you verified in the commit message.
 - **Repo layout** follows PRD §5 (`web/`, `forecast-service/`, `supabase/`, `docs/`, root `README.md` / `.gitignore` / `.cursorignore`, `.github/workflows/ci.yml`). The three `Types_of_*.txt` menu files are the **seed source** for `seed_menu.py`. The Stage-2 `Submit.py` / `orders_log.txt` are reference artifacts — leave them or move to an `archive/` folder; they are not part of the Stage-3 build.
-- **Secrets:** only `NEXT_PUBLIC_*` reach the browser; the service-role and OpenRouter keys are server-only. Never commit `.env` (PRD §6, §17). Validate all env with Zod at boot and `process.exit(1)` on failure.
+- **Secrets:** only `NEXT_PUBLIC_*` reach the browser; the service-role and OpenRouter keys are server-only. Never commit `.env` (PRD §6, §17). Validate all env with Zod at boot and `process.exit(1)` on failure. The captured keys live in the git-ignored `Supabase_OpenRouter_Credentials.txt`; Phase 1 transcribes them into `web/.env.local` (git-ignored) for local dev, and they go into the Vercel dashboard at the final manual deploy.
 - **One envelope, one pricer:** every route returns the PRD §11.1 envelope via `lib/response.ts`; **all** money math lives only in `lib/pricing.ts` (PRD §9). Server prices are authoritative — the client never sends prices.
 - **Test stack:** `web/` → **Vitest** (unit) + **@testing-library/react** (components) + **Playwright** (e2e). `forecast-service/` → **pytest**. Every phase adds the tests listed in its *Definition of Done*; CI (`ci.yml`) runs `npm ci → tsc --noEmit → lint → test → npm audit --audit-level=high` and must stay green. (This exceeds the PRD §19 "no test suite" minimum — deliberately, for correctness and Q&A talking points.)
-- **Commit rhythm:** one focused commit per phase (or per clean sub-step), pushed to `origin/main`, then redeploy.
+- **Commit rhythm:** one focused commit per phase (or per clean sub-step), pushed to `origin/main`. No per-phase redeploy — the single Vercel deploy is manual and happens in Phase 8.
 
 ---
 
@@ -57,13 +61,13 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 
 **Goal:** every account, key, and local tool ready so no later phase is blocked. Not a coding session — a checklist.
 
-- [ ] **Accounts:** GitHub (✅ `Ashwin-ap/PizzaFlow` exists), **Supabase** (free), **OpenRouter** (free — no card), **Vercel** (Hobby), **Render** or Railway (free) for the forecast service.
+- [ ] **Accounts:** GitHub (✅ exists), **Supabase** (✅ project `SliceMatic_Grp8` created), **OpenRouter** (✅ key ready), **Vercel** (✅ account exists — used only for the final manual deploy). **Render/Railway** for the forecast service is **deferred** (bonus Phase 7 only).
 - [ ] **OpenRouter:** create an API key; on `openrouter.ai/models` (filter Price → Free) confirm `meta-llama/llama-4-scout:free` + `meta-llama/llama-3.3-70b-instruct:free` are live $0 endpoints (PRD §12.2 — re-verify before submit).
-- [ ] **Local tooling:** Node.js Active LTS (20+, verify), npm, Python 3.11+ (verify), Git, and optionally the Supabase CLI.
-- [ ] **Supabase project:** create it now (empty); copy the **project URL**, **anon key**, **service-role key** for Phase 1's env.
+- [ ] **Local tooling:** Node.js Active LTS (verify), npm, Python 3.11+ (verify), Git, and the **Supabase CLI** (via `npx supabase` — required for the chosen `db push` migration route; run `supabase login`).
+- [ ] **Supabase project:** create it (empty); copy the **bare project URL**, **publishable/anon key**, **secret/service-role key**, and the **DB password** into the git-ignored scratch file `Supabase_OpenRouter_Credentials.txt` (repo root). ⚠️ Use the **bare** URL (`https://<ref>.supabase.co`), not the `/rest/v1/` REST endpoint. These values become `web/.env.local` in Phase 1.
 - [ ] Have the three `Types_of_*.txt` menu files on hand (they are the seed source).
 
-**Definition of Done:** all keys captured in a local scratch note (never committed); Supabase project exists; `node -v` / `python --version` confirm supported versions.
+**Definition of Done:** all keys captured in the git-ignored `Supabase_OpenRouter_Credentials.txt` (never committed — transcribed into `web/.env.local` in Phase 1), protected by a root `.gitignore`; Supabase project exists; Supabase CLI installed + `supabase login` done; `node -v` / `python --version` confirm supported versions.
 
 ---
 
@@ -76,15 +80,15 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 **Steps:**
 1. Scaffold `web/` — Next.js 16 (App Router, **TypeScript strict**, no `any`), Tailwind **v4**.
 2. Wire the **design system** from PRD §16.2: put all colour/shadow/typography tokens in a Tailwind v4 `@theme{}` block; dark surfaces overridden under `.dark`; `next/font` for Inter + JetBrains Mono; `lucide-react` for icons; the no-flash inline script in `app/layout.tsx` (`<head>`, `suppressHydrationWarning` on `<html>`); a `ThemeToggle` component.
-3. `lib/env.ts` — Zod-validated env (§6), crash on bad config.
+3. `lib/env.ts` — Zod-validated env (§6), crash on bad config. Create **`web/.env.local`** (git-ignored) by transcribing the values from `Supabase_OpenRouter_Credentials.txt` (bare `NEXT_PUBLIC_SUPABASE_URL`, publishable key, `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`).
 4. `lib/response.ts` — success/error/paginated envelope helpers + the §11.2 error codes.
 5. `app/api/health/route.ts` (200, no DB) and `app/api/ready/route.ts` (light Supabase check → 503 if down).
 6. Repo hygiene: root `.gitignore` + `.cursorignore` (§5), `.github/workflows/ci.yml` (§18 CI gate).
 7. A minimal landing `app/page.tsx` (branded shell, design tokens visible) — real flow comes in Phase 4.
-8. **Deploy:** import `web/` to Vercel, set env vars, get the **public URL**.
+8. **Run & verify locally:** `npm run dev` → confirm the branded shell renders at `localhost:3000`. (No Vercel deploy — that's the single manual step in Phase 8.)
 
 **Definition of Done:**
-- [ ] Live Vercel URL renders the branded shell in **light + dark** (no flash), responsive desktop + mobile.
+- [ ] **`localhost:3000`** renders the branded shell in **light + dark** (no flash), responsive desktop + mobile.
 - [ ] `/api/health` → 200; `/api/ready` → 200 when Supabase reachable.
 - [ ] CI is green; `npm audit` clean; Next.js on patched 16.2.x.
 - [ ] **Tests:** unit for `lib/env.ts` (rejects bad config) and `lib/response.ts` (envelope shapes); a smoke render test for the layout.
@@ -140,7 +144,7 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 
 ## Phase 4 — Customer ordering UI (stepper + design system)
 
-**Goal:** the complete customer flow on the live URL — intake → quantity → menu builder → bill → payment → confirm — wired to the Phase 3 APIs, styled with the design system.
+**Goal:** the complete customer flow running locally (`localhost:3000`) — intake → quantity → menu builder → bill → payment → confirm — wired to the Phase 3 APIs, styled with the design system.
 
 **PRD refs:** §8 (FR-1…FR-12), §10.2 (8 edge cases in UI), §10.3 (a11y, no white-screen), §15.1 (flow diagram), §16 (architecture + design system), §9 (client preview bill uses the same constants).
 
@@ -152,7 +156,7 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 5. Apply `.btn` (primary invert-on-hover + scale), `.input` focus rings, card recipes, `canvas-soft` bill panel, full light/dark, responsive (desktop + mobile).
 
 **Definition of Done:**
-- [ ] Full order placeable end-to-end on the live URL; confirmation echoes the saved order; "New order" resets.
+- [ ] Full order placeable end-to-end locally (`localhost:3000`); confirmation echoes the saved order; "New order" resets.
 - [ ] All 8 edge cases (§10.2) handled in-UI with the exact PRD error messages; no unhandled exception / white-screen.
 - [ ] Client preview bill equals the server bill to the paise.
 - [ ] Dark mode + responsive verified; a11y (labels, focus, contrast AA, `aria-live`).
@@ -233,7 +237,7 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 1. Walk **every** §17 checklist item: keys server-only, RLS verified with a real non-admin user, server-authoritative pricing, Zod re-validation, rate limits, CSV guard, LLM output menu-validated, cron secret, env crash-on-misconfig, patched Next 16.2.x, `npm audit` clean, no `.env` in git, no stack traces.
 2. **README.md** (§22): architecture diagram (reuse §3), setup (env/migrations/seed/run/deploy), **AI A + C descriptions with UX value**, **full Feature A system prompt** (§23.3) + model rationale (§12.2), Feature C model/features/RMSE, per-endpoint API docs (§11.4), public Vercel URL, read-only Supabase access, forecast-service URL.
 3. Share **read-only** Supabase access with the grader; provision the grader admin account.
-4. Configure Vercel Cron; warm Render + Vercel; run the §18 demo-day checklist (health probes, live test order → appears in dashboard, forecast renders, CSV downloads).
+4. **Manual Vercel deploy (the single, developer-run deploy):** import the GitHub repo to Vercel with **root directory `web/`**, set all env vars from `Supabase_OpenRouter_Credentials.txt`, and get the **public URL**. Then (bonus only) configure Vercel Cron; warm services; run the §18 demo-day checklist (health probes, live test order → appears in dashboard, forecast renders, CSV downloads).
 5. Prep §21 Q&A: rehearse `computeBill`, the validators, `is_admin()`, `/api/orders` pricing, the OpenRouter wrapper, the forecast feature-builder + RMSE; rehearse the live **"change `DISCOUNT_THRESHOLD` 5→3"** edit.
 6. Loom (3–5 min): ordering (with a recommendation) → admin login → filters/revenue/top pizza/busiest hour → CSV → forecast chart.
 
@@ -249,7 +253,7 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 
 | Rubric component (PRD §2) | Pts | Delivered by |
 |---|---|---|
-| Vercel frontend — live, responsive, full flow, no crashes | 10 | Phases 1, 4 (+ every redeploy) |
+| Vercel frontend — live, responsive, full flow, no crashes | 10 | Phases 1, 4 (built + verified locally; live via the final manual deploy in Phase 8) |
 | Supabase DB — 3+ tables, orders saved, menu from DB, dashboard | 12 | Phases 2, 3, 6 |
 | Auth + admin dashboard — login, filters, revenue, CSV | 8 | Phase 6 |
 | AI feature — OpenRouter, system prompt in README, real UX value | 12 | Phases 5, 8 |

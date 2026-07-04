@@ -1,0 +1,26 @@
+# ── Secrets (never commit) ──────────────────────────────────────────
+Supabase_OpenRouter_Credentials.txt
+*[Cc]redentials*
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Dependencies / build output ─────────────────────────────────────
+node_modules/
+.next/
+out/
+dist/
+build/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ── Editor / OS / platform ──────────────────────────────────────────
+.vercel
+.DS_Store
+Thumbs.db
+*.log
+*.tsbuildinfo

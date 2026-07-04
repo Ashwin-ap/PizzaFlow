@@ -1,0 +1,223 @@
+@import "tailwindcss";
+
+/* Class-based dark mode (toggled by adding `.dark` to <html>). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * SliceMatic Visual Language (PRD §16.2).
+ * Colors live in @theme so Tailwind generates bg / text / border utilities
+ * that reference the color CSS variables — this is why dark mode works by
+ * simply re-declaring the surface/text vars under `.dark` below.
+ */
+@theme {
+  /* Accents — identical in light & dark */
+  --color-primary: #533afd;
+  --color-primary-deep: #4434d4;
+  --color-primary-press: #2e2b8c;
+  --color-primary-soft: #665efd;
+  --color-primary-subdued: #b9b9f9;
+  --color-brand-dark: #1c1e54;
+  --color-ruby: #ea2261;
+  --color-magenta: #f96bee;
+  --color-star: #f5a623;
+  --color-green: #0d8f6f;
+  --color-green-soft: #5fd0a8;
+
+  /* Surfaces & text — LIGHT (overridden under .dark) */
+  --color-canvas: #ffffff;
+  --color-canvas-soft: #f6f9fc;
+  --color-hairline: #e3e8ee;
+  --color-hairline-input: #a8c3de;
+  --color-ink: #0d253d;
+  --color-ink-secondary: #273951;
+  --color-ink-mute: #64748d;
+
+  /* Blue-tinted shadows */
+  --shadow-1: 0 1px 3px rgba(0, 55, 112, 0.08);
+  --shadow-2: 0 8px 24px rgba(0, 55, 112, 0.08), 0 2px 6px rgba(0, 55, 112, 0.04);
+
+  /* Fonts (next/font vars set on <html>) */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+
+  /* Layout */
+  --container-max: 1180px;
+}
+
+/* Dark surfaces/text — accents unchanged */
+.dark {
+  --color-canvas: #0d1117;
+  --color-canvas-soft: #161c26;
+  --color-hairline: #262d3a;
+  --color-hairline-input: #38414f;
+  --color-ink: #e8edf4;
+  --color-ink-secondary: #c2ccd9;
+  --color-ink-mute: #8a95a4;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-feature-settings: "ss01" 1;
+    transition: background-color 0.3s, color 0.3s;
+  }
+  /* Tabular numbers for every price / metric cell */
+  .tnum {
+    font-feature-settings: "tnum" 1;
+  }
+}
+
+@layer components {
+  .container-x {
+    width: 100%;
+    max-width: var(--container-max);
+    margin-inline: auto;
+    padding-inline: 24px;
+  }
+
+  /* JetBrains-Mono uppercase eyebrow */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--color-primary-deep);
+  }
+  .dark .eyebrow {
+    color: var(--color-primary-soft);
+  }
+
+  /* Buttons — pill, signature scale-1.1 + shadow-2 on hover */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 9999px;
+    padding: 8px 16px;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.2;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.3s, color 0.3s, transform 0.3s, box-shadow 0.3s;
+  }
+  .btn:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-2);
+  }
+  .btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(83, 58, 253, 0.35);
+  }
+  .btn-primary {
+    background-color: var(--color-primary);
+    color: #ffffff;
+  }
+  .btn-primary:hover {
+    background-color: #ffffff;
+    color: var(--color-primary);
+  }
+  .btn-primary:active {
+    background-color: var(--color-primary-press);
+    color: #ffffff;
+    transform: translateY(1px);
+  }
+  .btn-secondary {
+    background-color: var(--color-canvas);
+    color: var(--color-primary);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
+  }
+  .btn-secondary:hover {
+    background-color: var(--color-primary);
+    color: #ffffff;
+  }
+
+  /* Inputs — 3px focus ring */
+  .input {
+    width: 100%;
+    border-radius: 6px;
+    border: 1px solid var(--color-hairline-input);
+    background-color: var(--color-canvas);
+    padding: 8px 12px;
+    font-size: 15px;
+    font-weight: 300;
+    color: var(--color-ink);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .input::placeholder {
+    color: var(--color-ink-mute);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(83, 58, 253, 0.12);
+  }
+
+  /* Card — shadow-1 resting → lift + shadow-2 on hover */
+  .card {
+    border-radius: 16px;
+    border: 1px solid var(--color-hairline);
+    background-color: var(--color-canvas);
+    box-shadow: var(--shadow-1);
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-2);
+  }
+
+  /* Filter chip */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 9999px;
+    border: 1px solid var(--color-hairline);
+    background-color: var(--color-canvas);
+    padding: 6px 14px;
+    font-size: 14px;
+    color: var(--color-ink-secondary);
+    cursor: pointer;
+    transition: transform 0.3s, background-color 0.3s, color 0.3s;
+  }
+  .chip:hover {
+    transform: scale(1.1);
+    background-color: var(--color-ink);
+    color: #ffffff;
+  }
+  .chip.is-active {
+    background-color: var(--color-primary);
+    color: #ffffff;
+    border-color: var(--color-primary);
+  }
+
+  /* Soft badge */
+  .tag-soft {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    background-color: var(--color-primary-subdued);
+    color: var(--color-primary-deep);
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+  }
+  .btn:hover,
+  .chip:hover,
+  .card:hover {
+    transform: none;
+  }
+}

@@ -1,0 +1,10 @@
+# Keep secrets out of AI-assistant indexing (mirrors .gitignore secret paths)
+Supabase_OpenRouter_Credentials.txt
+*[Cc]redentials*
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+node_modules/
+.next/
