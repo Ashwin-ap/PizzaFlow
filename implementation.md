@@ -35,7 +35,7 @@ Each phase is **one session**. In a session:
 | 0 | Prerequisites (accounts, keys, local tooling) | ✅ | — | Supabase `SliceMatic_Grp8` live; CLI logged in; secrets git-ignored; new sb_ keys |
 | 1 | Foundation & first deploy | ✅ | cb69f8b | local-first (no deploy); next@16.2.10, tailwind@4.3.2; env names use PUBLISHABLE/SECRET; tests 10✓ |
 | 2 | Database — schema, RLS, seed | ✅ | 3963dde | 5 tables + RLS live via `supabase db push`; **TS seed** (`web/scripts/`, not Python) reuses supabase-js; 23 items seeded, swap-safe; admin `admin@slicematic.dev` provisioned; `0003_views` deferred→P6; `seed_orders` stubbed→P7; RLS test local-only (`npm run test:rls`) |
-| 3 | Core domain libs + `/api/menu` + `/api/orders` | ⬜ | — | |
+| 3 | Core domain libs + `/api/menu` + `/api/orders` | ✅ | 44287e0 | server-authoritative pricing (`lib/pricing.ts`, integer paise); **atomic `create_order` RPC**; idempotency via `Idempotency-Key` header + unique col; durable Supabase rate limiter; **RPCs revoked from anon** (verified 42501); admin client → P6; route+RLS tests opt-in (`npm run test:integration` / `test:rls`) |
 | 4 | Customer ordering UI (stepper + design system) | ⬜ | — | |
 | 5 | AI Feature A — Recommendation engine | ⬜ | — | |
 | 6 | Admin auth + dashboard (metrics, filters, CSV) | ⬜ | — | |
@@ -134,11 +134,11 @@ Legend: ⬜ todo · 🔄 in progress · ✅ done
 6. `app/api/orders/route.ts` — POST: re-validate (Zod), look up each `code` in `menu_items`, build `Selected[]` from **DB prices**, `computeBill`, insert `orders` + `order_line_items` **atomically** with snapshots; rate-limit + body cap + idempotency guard; envelope + error codes.
 
 **Definition of Done:**
-- [ ] `GET /api/menu` returns the seeded menu with `pricePaise`.
-- [ ] `POST /api/orders` prices server-side, **ignores client-sent prices**, persists order + line items atomically; returns `{ order, bill }`.
-- [ ] Rejects: bad name/phone/qty/payment → `VALIDATION_ERROR`; unknown code → `MENU_ITEM_NOT_FOUND`; replay → `CONFLICT`; flood → `RATE_LIMITED`.
-- [ ] **Tests (critical):** `computeBill` unit tests hitting the §23 traces exactly — 5× Cheese Burst/BBQ/Extra-Cheese → **₹3594.87** (359487 paise), single Thin/Margherita/Olives → **₹586.46**, and the qty=4 vs qty=5 discount boundary; validator unit tests covering all §10.1 rules and the 8 edge cases (§10.2); integration tests for `/api/orders` (happy, validation, menu-not-found, tampered-price ignored, idempotency).
-- [ ] Commit: `feat: pricing engine + validators + server-authoritative /api/menu & /api/orders`
+- [x] `GET /api/menu` returns the seeded menu with `pricePaise`. *(anon client + RLS; grouped bases/pizzas/toppings; curl + integration verified.)*
+- [x] `POST /api/orders` prices server-side, **ignores client-sent prices**, persists order + line items atomically; returns `{ order, bill }`. *(via `create_order` RPC; tampered prices Zod-stripped + rebuilt from DB; atomicity proven — failing line item → no orphan.)*
+- [x] Rejects: bad name/phone/qty/payment → `VALIDATION_ERROR`; unknown code → `MENU_ITEM_NOT_FOUND`; replay → `CONFLICT`; flood → `RATE_LIMITED`. *(all verified live; also oversized body → 400.)*
+- [x] **Tests (critical):** `computeBill` unit tests hit the §23 traces exactly (5× → **359487 paise**, single → **58646**, qty4-vs-qty5 boundary); validator units cover §10.1 + the 8 edge cases; route integration tests (happy, validation, menu-not-found, tampered-price ignored, idempotency 409, flood 429, atomic rollback). *(36 unit in CI; 9 route + 4 RLS opt-in local.)*
+- [x] Commit: `44287e0` — `feat: pricing engine + validators + server-authoritative /api/menu & /api/orders`
 
 ---
 
