@@ -27,8 +27,11 @@ export const metadata: Metadata = {
     "SliceMatic Stage 3 — fast pizza ordering. Built on Next.js 16 + Supabase.",
 };
 
-// Runs before paint: applies the saved (or system) theme so there is no flash.
-const NO_FLASH_SCRIPT = `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`;
+// Runs before paint (no flash). Light is the default; dark applies ONLY when the
+// user has explicitly toggled to it (saved in localStorage). System dark-mode is
+// intentionally NOT honoured, so a first-time visitor always lands on the light
+// brand theme.
+const NO_FLASH_SCRIPT = `(function(){try{if(localStorage.getItem('theme')==='dark'){document.documentElement.classList.add('dark');}}catch(e){}})();`;
 
 export default function RootLayout({
   children,
