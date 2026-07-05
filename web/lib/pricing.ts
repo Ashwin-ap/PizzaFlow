@@ -8,6 +8,8 @@
  */
 export const MIN_QTY = 1;
 export const MAX_QTY = 10;
+export const MIN_TOPPINGS = 1; // every pizza carries at least one topping
+export const MAX_TOPPINGS = 5; // …and at most five
 export const DISCOUNT_THRESHOLD = 5;
 export const DISCOUNT_RATE = 0.1; // 10%
 export const GST_RATE = 0.18; // 18%
@@ -18,11 +20,11 @@ export interface PricedItem {
   pricePaise: number;
 }
 
-/** One configured pizza: a base + a pizza + a topping, each priced in paise. */
+/** One configured pizza: a base + a pizza + one-or-more toppings, each priced in paise. */
 export interface Selected {
   base: PricedItem;
   pizza: PricedItem;
-  topping: PricedItem;
+  toppings: PricedItem[];
 }
 
 export interface BillLineItem extends Selected {
@@ -51,7 +53,9 @@ export function computeBill(pizzas: Selected[]): Bill {
   const lineItems: BillLineItem[] = pizzas.map((p) => ({
     ...p,
     unitPricePaise:
-      p.base.pricePaise + p.pizza.pricePaise + p.topping.pricePaise,
+      p.base.pricePaise +
+      p.pizza.pricePaise +
+      p.toppings.reduce((s, t) => s + t.pricePaise, 0),
   }));
   const quantity = lineItems.length;
   const subtotalPaise = lineItems.reduce((s, li) => s + li.unitPricePaise, 0);

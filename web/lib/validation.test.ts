@@ -88,7 +88,7 @@ describe("orderBodySchema", () => {
     name: "Ravi Kumar",
     phone: "9876543210",
     paymentMode: "UPI",
-    lineItems: [{ baseCode: "B1", pizzaCode: "P1", toppingCode: "T1" }],
+    lineItems: [{ baseCode: "B1", pizzaCode: "P1", toppingCodes: ["T1"] }],
   };
   it("accepts a valid body", () => {
     expect(orderBodySchema.safeParse(valid).success).toBe(true);
@@ -96,10 +96,20 @@ describe("orderBodySchema", () => {
   it("strips any injected price fields (server-authoritative pricing)", () => {
     const tampered = {
       ...valid,
-      lineItems: [{ baseCode: "B1", pizzaCode: "P1", toppingCode: "T1", pricePaise: 1 }],
+      lineItems: [{ baseCode: "B1", pizzaCode: "P1", toppingCodes: ["T1"], pricePaise: 1 }],
     };
     const parsed = orderBodySchema.parse(tampered);
     expect(parsed.lineItems[0]).not.toHaveProperty("pricePaise");
+  });
+  it("requires 1–5 toppings per pizza", () => {
+    const withToppings = (codes: string[]) =>
+      orderBodySchema.safeParse({
+        ...valid,
+        lineItems: [{ baseCode: "B1", pizzaCode: "P1", toppingCodes: codes }],
+      });
+    expect(withToppings([]).success).toBe(false); // zero rejected
+    expect(withToppings(["T1", "T2", "T3", "T4", "T5", "T6"]).success).toBe(false); // six rejected
+    expect(withToppings(["T1", "T2", "T3"]).success).toBe(true); // three ok
   });
   it("reports field errors for bad phone", () => {
     const r = orderBodySchema.safeParse({ ...valid, phone: "12345" });

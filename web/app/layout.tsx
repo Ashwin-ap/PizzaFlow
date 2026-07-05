@@ -1,13 +1,15 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Lexend, JetBrains_Mono } from "next/font/google";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
-const inter = Inter({
+// Lexend — Zomato brand-book primary typeface. next/font self-hosts it (fetched at
+// build, served from our own origin), so there's no runtime request to Google.
+const lexend = Lexend({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-inter",
+  variable: "--font-lexend",
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -34,7 +36,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
+      className={`${lexend.variable} ${jetbrainsMono.variable} antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-screen flex flex-col">
@@ -47,7 +49,12 @@ export default function RootLayout({
               </span>
               <span className="inline-block w-[7px] h-[7px] rounded-full bg-primary" />
             </Link>
-            <ThemeToggle />
+            <div className="flex items-center gap-1.5">
+              <Link href="/admin" className="link-quiet">
+                Admin
+              </Link>
+              <ThemeToggle />
+            </div>
           </div>
         </header>
         <main className="flex-1">{children}</main>

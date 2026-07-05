@@ -92,9 +92,37 @@ export async function POST(request: Request) {
       .limit(10);
     const history = summarizeHistory(historyData ?? []);
 
-    // 6) Cold start (no history) OR no API key → deterministic, no LLM.
+    // 5b) PERSONALISED fallback counts — the customer's OWN most-ordered pizza + topping
+    // (by snapshot name → current menu code). Multi-topping orders store a comma-joined
+    // topping_name, so split it. When the customer has usable history we recommend from
+    // THIS, not the global popularity, so a returning customer's picks reflect what THEY
+    // order — never a one-size-fits-all default. Cold-start still uses global counts.
+    const custCounts: Counts = { pizza: {}, topping: {} };
+    for (const row of (historyData ?? []) as {
+      order_line_items?: { pizza_name?: string | null; topping_name?: string | null }[] | null;
+    }[]) {
+      for (const li of row.order_line_items ?? []) {
+        const p = li.pizza_name ? menu.pizzas.find((x) => x.name === li.pizza_name) : undefined;
+        if (p) custCounts.pizza[p.code] = (custCounts.pizza[p.code] ?? 0) + 1;
+        for (const tn of String(li.topping_name ?? "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)) {
+          const t = menu.toppings.find((x) => x.name === tn);
+          if (t) custCounts.topping[t.code] = (custCounts.topping[t.code] ?? 0) + 1;
+        }
+      }
+    }
+    const hasCustHistory = Object.keys(custCounts.pizza).length > 0;
+    const deterministicPick = () =>
+      hasCustHistory
+        ? { ...pickDeterministic(menu, custCounts), reason: "Picked from your recent orders." }
+        : pickDeterministic(menu, counts);
+
+    // 6) Cold start (no history) OR no API key → deterministic (personalised if we have
+    // this customer's history), no LLM.
     if (history.length === 0 || !env.OPENROUTER_API_KEY) {
-      return ok({ recommendation: toResponse(pickDeterministic(menu, counts), menu) });
+      return ok({ recommendation: toResponse(deterministicPick(), menu) });
     }
 
     // 7) Returning customer → LLM, with defensive parse + menu-validation.
@@ -116,7 +144,7 @@ export async function POST(request: Request) {
     } catch (e) {
       console.warn("[recommend] OpenRouter failed — deterministic fallback:", (e as Error).message);
     }
-    return ok({ recommendation: toResponse(pickDeterministic(menu, counts), menu) });
+    return ok({ recommendation: toResponse(deterministicPick(), menu) });
   } catch (e) {
     console.error("recommend route error:", e);
     // Graceful, non-blocking: the client just proceeds without a suggestion.

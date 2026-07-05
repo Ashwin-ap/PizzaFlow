@@ -40,7 +40,7 @@ export function ForecastChart({
   const barW = band * 0.6;
 
   const ariaLabel = `Predicted orders per hour for the next 7 days. Busiest hours: ${forecast.top3PeakHours
-    .map((p) => `${formatHourIST(p.hour)} at ${p.avgPredicted.toFixed(1)} orders`)
+    .map((p) => `${formatHourIST(p.hour)} at ${Math.round(p.avgPredicted)} orders`)
     .join(", ")}.`;
 
   return (
@@ -77,7 +77,7 @@ export function ForecastChart({
                 className={isPeak ? "fill-primary" : "fill-primary-subdued"}
               />
               <text x={x + barW / 2} y={y - 5} textAnchor="middle" fontSize="10" className="fill-ink-mute">
-                {a.avgPredicted.toFixed(1)}
+                {Math.round(a.avgPredicted)}
               </text>
               <text x={x + barW / 2} y={H - 10} textAnchor="middle" fontSize="10" className="fill-ink-mute">
                 {formatHourIST(a.hour)}
@@ -92,7 +92,7 @@ export function ForecastChart({
           <div key={p.hour} className="card p-4">
             <p className="eyebrow mb-1">— Peak #{i + 1}</p>
             <p className="text-xl font-semibold text-ink">{formatHourIST(p.hour)}</p>
-            <p className="tnum text-sm text-ink-mute">{p.avgPredicted.toFixed(1)} orders/day (avg)</p>
+            <p className="tnum text-sm text-ink-mute">{Math.round(p.avgPredicted)} orders/day (avg)</p>
           </div>
         ))}
       </div>

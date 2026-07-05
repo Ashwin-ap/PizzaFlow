@@ -5,6 +5,7 @@
  * the messages match across stages.
  */
 import { z } from "zod";
+import { MIN_TOPPINGS, MAX_TOPPINGS } from "@/lib/pricing";
 
 export const NAME_ERR =
   "Name must be 2–40 letters (spaces allowed), no numbers or symbols.";
@@ -61,11 +62,17 @@ export const choiceSchema = (n: number) =>
     }
   });
 
-/** One line item in the order body — CODES ONLY. No prices ever come from the client. */
+export const TOPPINGS_ERR = `Pick 1 to ${MAX_TOPPINGS} toppings for each pizza.`;
+
+/** One line item in the order body — CODES ONLY. No prices ever come from the client.
+ *  A pizza carries 1–5 topping codes (deduped downstream by the server pricer). */
 export const lineItemSchema = z.object({
   baseCode: z.string().min(1),
   pizzaCode: z.string().min(1),
-  toppingCode: z.string().min(1),
+  toppingCodes: z
+    .array(z.string().min(1))
+    .min(MIN_TOPPINGS, { message: TOPPINGS_ERR })
+    .max(MAX_TOPPINGS, { message: TOPPINGS_ERR }),
 });
 
 /**

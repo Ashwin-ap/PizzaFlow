@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { computeBill, type Selected } from "@/lib/pricing";
+import { Check } from "lucide-react";
+import { computeBill, MAX_QTY, type Selected } from "@/lib/pricing";
 import { orderBodySchema } from "@/lib/validation";
 import {
   fetchMenu,
@@ -15,18 +16,18 @@ import {
 } from "@/lib/order-api";
 import { IntakeForm } from "./IntakeForm";
 import { RecommendCard } from "./RecommendCard";
-import { QuantityStep } from "./QuantityStep";
-import { PizzaBuilderRow } from "./PizzaBuilderRow";
+import { PizzaBuilder } from "./PizzaBuilder";
+import { Cart, CartBar } from "./Cart";
 import { BillTable } from "./BillTable";
+import type { Craving } from "./CravingsRail";
 import { PaymentStep } from "./PaymentStep";
 import { Confirmation } from "./Confirmation";
 
-type Step = "intake" | "recommend" | "quantity" | "builder" | "bill" | "payment" | "confirm";
+type Step = "intake" | "recommend" | "builder" | "bill" | "payment" | "confirm";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "intake", label: "Details" },
   { key: "recommend", label: "For you" },
-  { key: "quantity", label: "Quantity" },
   { key: "builder", label: "Build" },
   { key: "bill", label: "Bill" },
   { key: "payment", label: "Payment" },
@@ -40,18 +41,32 @@ const priced = (it: MenuItem | undefined) =>
 /** A menu is usable only if every category has at least one available item (FR-9). */
 const menuUsable = (m: Menu) => m.bases.length > 0 && m.pizzas.length > 0 && m.toppings.length > 0;
 
+/** A clean-slate pizza: nothing selected yet (the builder resets to this after each add). */
+const emptyDraft = (): OrderLineItem => ({ baseCode: "", pizzaCode: "", toppingCodes: [] });
+
+/** Local wall-clock time as `YYYY-MM-DD HH:MM:SS` for the invoice header. */
+const formatTs = (d: Date): string => {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+};
+
 export function Stepper() {
   const [step, setStep] = useState<Step>("intake");
   const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null);
   const [customer, setCustomer] = useState({ name: "", phone: "" });
-  const [quantity, setQuantity] = useState<number | null>(null);
-  const [selections, setSelections] = useState<OrderLineItem[]>([]);
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>("Cash");
 
-  // AI recommendation (Feature A): cached so re-entry doesn't refetch; `prefill`
-  // carries an accepted pick into the first builder row.
+  // The cart IS the order — quantity emerges from it (min 1 to proceed, capped at
+  // MAX_QTY). `draft` is the pizza currently being built in the tap-to-pick menu.
+  const [cart, setCart] = useState<OrderLineItem[]>([]);
+  const [draft, setDraft] = useState<OrderLineItem | null>(null);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("Cash");
+  // Invoice timestamp — stamped once when the bill is opened (stable across re-renders).
+  const [billAt, setBillAt] = useState<string | null>(null);
+
+  // AI recommendation (Feature A): cached so re-entry doesn't refetch. Accepting a
+  // pick adds it straight to the cart (see useRecommendation) — the builder always
+  // opens on a clean slate.
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
-  const [prefill, setPrefill] = useState<{ pizzaCode: string; toppingCode: string } | null>(null);
 
   const [menu, setMenu] = useState<Menu | null>(null);
   const [menuLoading, setMenuLoading] = useState(true);
@@ -75,59 +90,83 @@ export function Stepper() {
   }
 
   // Load the menu once on mount (FR-7); ordering is gated on it (FR-9).
-  // Fetching external data is the intended use of an effect; loadMenu's internal
-  // setState is what the lint rule flags, so we suppress it here.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadMenu();
   }, []);
 
-  // Size the builder rows to the chosen quantity, defaulting each to the first
-  // item of every category — preserving existing choices on resize (FR-6/FR-8).
+  // Entering the Build step always opens on a fully-empty clean slate — nothing
+  // pre-selected — so the customer picks base / pizza / toppings from scratch.
   useEffect(() => {
-    if (step !== "builder" || !menu || !quantity) return;
-    // One-time (re)size when entering the builder or when quantity/menu changes;
-    // preserves existing choices. Deriving this state is a deliberate sync.
+    if (step !== "builder" || !menu || draft) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelections((prev) => {
-      if (prev.length === quantity) return prev;
-      // Row 0 honours an accepted recommendation (pizza + topping only — base stays
-      // the default); guard each prefilled code against the live menu (swap-safety).
-      const build = (i: number): OrderLineItem => ({
-        baseCode: menu.bases[0].code,
-        pizzaCode:
-          i === 0 && prefill && find(menu.pizzas, prefill.pizzaCode)
-            ? prefill.pizzaCode
-            : menu.pizzas[0].code,
-        toppingCode:
-          i === 0 && prefill && find(menu.toppings, prefill.toppingCode)
-            ? prefill.toppingCode
-            : menu.toppings[0].code,
-      });
-      return Array.from({ length: quantity }, (_, i) => prev[i] ?? build(i));
-    });
-  }, [step, menu, quantity, prefill]);
+    setDraft(emptyDraft());
+  }, [step, menu, draft]);
 
   const previewBill =
-    menu && selections.length > 0
+    menu && cart.length > 0
       ? computeBill(
-          selections.map<Selected>((s) => ({
+          cart.map<Selected>((s) => ({
             base: priced(find(menu.bases, s.baseCode)),
             pizza: priced(find(menu.pizzas, s.pizzaCode)),
-            topping: priced(find(menu.toppings, s.toppingCode)),
+            toppings: s.toppingCodes.map((c) => priced(find(menu.toppings, c))),
           })),
         )
       : null;
+
+  /** Append a fully-configured pizza to the cart (capped at MAX_QTY). */
+  function addLine(line: OrderLineItem) {
+    setCart((c) => (c.length >= MAX_QTY ? c : [...c, line]));
+  }
+
+  /** Builder "Add to cart": commit the draft, then reset to a clean slate. */
+  function addDraftToCart() {
+    if (!draft || cart.length >= MAX_QTY) return;
+    if (!draft.baseCode || !draft.pizzaCode || draft.toppingCodes.length === 0) return;
+    setCart((c) => [...c, draft]);
+    setDraft(emptyDraft());
+  }
+
+  /** Accept the AI pick — add it to the cart (default base + the recommended
+   *  pizza + topping), then continue to the (clean-slate) builder. */
+  function useRecommendation(rec: Recommendation) {
+    const base = menu?.bases[0];
+    if (base) {
+      addLine({ baseCode: base.code, pizzaCode: rec.pizzaCode, toppingCodes: [rec.toppingCode] });
+    }
+    setStep("builder");
+  }
+
+  /** Resolve a "What's on your mind" craving to a concrete pizza line (default
+   *  base + first topping; the pizza is matched by name, falling back to the first). */
+  function pickCraving(cr: Craving) {
+    if (!menu) return;
+    const pizza = menu.pizzas.find((p) => cr.match.test(p.name)) ?? menu.pizzas[0];
+    const base = menu.bases[0];
+    const topping = menu.toppings[0];
+    if (!pizza || !base || !topping) return;
+    addLine({ baseCode: base.code, pizzaCode: pizza.code, toppingCodes: [topping.code] });
+  }
+
+  function removeFromCart(index: number) {
+    setCart((c) => c.filter((_, i) => i !== index));
+  }
+
+  /** Open the bill step, stamping the invoice time once. */
+  function openBill() {
+    setBillAt(formatTs(new Date()));
+    setStep("bill");
+  }
 
   function reset() {
     setStep("intake");
     setSessionStartedAt(null);
     setCustomer({ name: "", phone: "" });
-    setQuantity(null);
-    setSelections([]);
+    setCart([]);
+    setDraft(null);
     setPaymentMode("Cash");
+    setBillAt(null);
     setRecommendation(null);
-    setPrefill(null);
     setSubmitError(null);
     setResult(null);
   }
@@ -139,7 +178,7 @@ export function Stepper() {
       phone: customer.phone,
       sessionStartedAt,
       paymentMode,
-      lineItems: selections,
+      lineItems: cart,
     };
     // Final client-side guard with the shared schema (server re-validates anyway).
     if (!orderBodySchema.safeParse(body).success) {
@@ -164,11 +203,15 @@ export function Stepper() {
   const orderingBlocked = !menuLoading && !!menuError;
 
   return (
-    <div className="container-x py-14 md:py-20 max-w-3xl">
+    <div
+      className={`container-x py-14 md:py-20 ${
+        step === "builder" || step === "intake" ? "max-w-5xl" : "max-w-3xl"
+      }`}
+    >
       <StepIndicator current={step} />
 
       {orderingBlocked && (
-        <div className="card p-5 border-ruby/40 flex flex-col gap-3" role="alert" aria-live="polite">
+        <div className="card p-5 border-ruby/40 flex flex-col gap-3 mt-8" role="alert" aria-live="polite">
           <p className="text-ink">{menuError}</p>
           <div>
             <button type="button" className="btn btn-secondary" onClick={() => void loadMenu()}>
@@ -183,6 +226,8 @@ export function Stepper() {
           {step === "intake" && (
             <IntakeForm
               initial={customer}
+              cartCount={cart.length}
+              onPickCraving={pickCraving}
               onNext={(c) => {
                 setCustomer(c);
                 if (!sessionStartedAt) setSessionStartedAt(new Date().toISOString());
@@ -196,75 +241,68 @@ export function Stepper() {
               phone={customer.phone}
               cached={recommendation}
               onFetched={setRecommendation}
-              onUseThis={(rec) => {
-                setPrefill({ pizzaCode: rec.pizzaCode, toppingCode: rec.toppingCode });
-                setStep("quantity");
-              }}
-              onSkip={() => setStep("quantity")}
-            />
-          )}
-
-          {step === "quantity" && (
-            <QuantityStep
-              initial={quantity}
-              onBack={() => setStep("intake")}
-              onNext={(q) => {
-                setQuantity(q);
-                setStep("builder");
-              }}
+              cart={cart}
+              menu={menu}
+              onRemovePick={removeFromCart}
+              onPickCraving={pickCraving}
+              onUseThis={useRecommendation}
+              onSkip={() => setStep("builder")}
             />
           )}
 
           {step === "builder" && (
             <div className="flex flex-col gap-5">
               <div>
-                <p className="eyebrow mb-2">— Step 4 · Build your pizzas</p>
-                <h2 className="text-2xl font-semibold text-ink">
-                  Pick a base, pizza &amp; topping for each
-                </h2>
+                <p className="eyebrow mb-2">— Step 3 · Build your pizzas</p>
+                <h2 className="text-2xl font-semibold text-ink">Build your perfect pizza</h2>
+                <p className="mt-1 text-sm text-ink-mute">
+                  Pick a base, pizza &amp; up to {5} toppings, then add it to your cart — up to {MAX_QTY} pizzas.
+                </p>
               </div>
-              {menuLoading || !menu ? (
+              {menuLoading || !menu || !draft ? (
                 <p className="text-ink-mute">Loading the menu…</p>
               ) : (
-                <>
-                  <div className="flex flex-col gap-4">
-                    {selections.map((sel, i) => (
-                      <PizzaBuilderRow
-                        key={i}
-                        index={i}
-                        menu={menu}
-                        value={sel}
-                        onChange={(next) =>
-                          setSelections((prev) => prev.map((s, j) => (j === i ? next : s)))
-                        }
-                      />
-                    ))}
+                <div className="grid gap-6 md:grid-cols-[1fr_320px]">
+                  <PizzaBuilder
+                    menu={menu}
+                    value={draft}
+                    onChange={setDraft}
+                    onAdd={addDraftToCart}
+                    cartCount={cart.length}
+                    max={MAX_QTY}
+                  />
+                  <div>
+                    <Cart
+                      cart={cart}
+                      menu={menu}
+                      bill={previewBill}
+                      onRemove={removeFromCart}
+                      onReview={openBill}
+                    />
+                    <CartBar qty={cart.length} bill={previewBill} onReview={openBill} />
                   </div>
-                  <div className="flex gap-3">
-                    <button type="button" className="btn btn-secondary" onClick={() => setStep("quantity")}>
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      disabled={selections.length === 0}
-                      onClick={() => setStep("bill")}
-                    >
-                      Review bill
-                    </button>
-                  </div>
-                </>
+                </div>
               )}
+              <div>
+                <button type="button" className="btn btn-secondary" onClick={() => setStep("recommend")}>
+                  Back
+                </button>
+              </div>
             </div>
           )}
 
           {step === "bill" && previewBill && (
             <div className="flex flex-col gap-5">
               <div>
-                <p className="eyebrow mb-2">— Step 5 · Your bill</p>
+                <p className="eyebrow mb-2">— Step 4 · Your bill</p>
                 <h2 className="text-2xl font-semibold text-ink">Here&apos;s the damage</h2>
               </div>
-              <BillTable bill={previewBill} />
+              <BillTable
+                bill={previewBill}
+                customerName={customer.name}
+                customerPhone={customer.phone}
+                timestamp={billAt ?? undefined}
+              />
               <div className="flex gap-3">
                 <button type="button" className="btn btn-secondary" onClick={() => setStep("builder")}>
                   Back
@@ -284,6 +322,7 @@ export function Stepper() {
               onPlaceOrder={() => void placeOrder()}
               submitting={submitting}
               error={submitError ?? undefined}
+              totalPaise={previewBill?.totalPaise}
             />
           )}
 
@@ -301,30 +340,63 @@ export function Stepper() {
   );
 }
 
-/** Compact 7-step progress header (PRD §16.2 nav-underline / active-chip pattern). */
+/** Slim checkout-style progress rail — a bar on mobile, numbered steps on desktop. */
 function StepIndicator({ current }: { current: Step }) {
   const activeIdx = STEPS.findIndex((s) => s.key === current);
+  const pct = ((activeIdx + 1) / STEPS.length) * 100;
+
   return (
-    <ol className="flex flex-wrap gap-2" aria-label="Order progress">
-      {STEPS.map((s, i) => {
-        const state = i < activeIdx ? "done" : i === activeIdx ? "active" : "todo";
-        return (
-          <li
-            key={s.key}
-            aria-current={state === "active" ? "step" : undefined}
-            className={
-              "tnum text-xs px-2.5 py-1 rounded-full border " +
-              (state === "active"
-                ? "bg-primary text-white border-primary"
-                : state === "done"
-                  ? "bg-canvas-soft text-ink-secondary border-hairline"
-                  : "text-ink-mute border-hairline")
-            }
-          >
-            {i + 1}. {s.label}
-          </li>
-        );
-      })}
-    </ol>
+    <div>
+      {/* Mobile: labelled progress bar */}
+      <div className="sm:hidden">
+        <p className="eyebrow mb-1.5">
+          Step {activeIdx + 1} of {STEPS.length} · {STEPS[activeIdx]?.label}
+        </p>
+        <div className="h-1.5 overflow-hidden rounded-full bg-canvas-soft">
+          <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+
+      {/* Desktop: numbered rail with connectors */}
+      <ol className="hidden items-center gap-1 sm:flex" aria-label="Order progress">
+        {STEPS.map((s, i) => {
+          const state = i < activeIdx ? "done" : i === activeIdx ? "active" : "todo";
+          const last = i === STEPS.length - 1;
+          return (
+            <li
+              key={s.key}
+              aria-current={state === "active" ? "step" : undefined}
+              className={`flex items-center gap-2 ${last ? "" : "flex-1"}`}
+            >
+              <span
+                className={
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs tnum " +
+                  (state === "done"
+                    ? "bg-primary text-white"
+                    : state === "active"
+                      ? "border-2 border-primary bg-canvas font-semibold text-primary"
+                      : "border border-hairline text-ink-mute")
+                }
+              >
+                {state === "done" ? <Check size={13} aria-hidden /> : i + 1}
+              </span>
+              <span
+                className={
+                  "hidden text-xs md:inline " +
+                  (state === "active"
+                    ? "font-medium text-ink"
+                    : state === "done"
+                      ? "text-ink-secondary"
+                      : "text-ink-mute")
+                }
+              >
+                {s.label}
+              </span>
+              {!last && <span className={`h-px flex-1 ${i < activeIdx ? "bg-primary" : "bg-hairline"}`} />}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }

@@ -14,7 +14,8 @@ beforeEach(() => {
 describe("home page (customer ordering flow)", () => {
   it("mounts the ordering stepper on the intake step", () => {
     render(<Home />);
-    expect(screen.getByText(/Who's ordering/)).toBeInTheDocument();
-    expect(screen.getByText(/1\. Details/)).toBeInTheDocument();
+    expect(screen.getByText(/built your way/i)).toBeInTheDocument();
+    // Progress rail is on the first ("Details") step.
+    expect(screen.getAllByText(/Details/).length).toBeGreaterThan(0);
   });
 });

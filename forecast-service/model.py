@@ -36,7 +36,10 @@ def build_hourly_grid(placed_at: list[str]) -> pd.DataFrame:
     if not placed_at:
         return pd.DataFrame(columns=cols)
 
-    utc = pd.to_datetime(pd.Series(placed_at), utc=True)
+    # format="ISO8601" handles a mix of fractional (UI orders via now()) and
+    # whole-second (seeded) timestamps — without it, pandas infers one format from
+    # the first row and rejects the rest.
+    utc = pd.to_datetime(pd.Series(placed_at), utc=True, format="ISO8601")
     ist = (utc + pd.Timedelta(minutes=IST_OFFSET_MIN)).dt.tz_localize(None)
     df = pd.DataFrame({"date": ist.dt.normalize(), "hour_of_day": ist.dt.hour})
     df = df[df["hour_of_day"].isin(OPERATING_HOURS)]

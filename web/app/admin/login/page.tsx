@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabase } from "@/lib/supabase/browser-ssr";
 
@@ -35,6 +36,12 @@ export default function AdminLoginPage() {
 
   return (
     <div className="container-x py-20 max-w-md">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1 text-sm text-ink-secondary no-underline hover:text-primary mb-8"
+      >
+        <span aria-hidden="true">←</span> Back to ordering
+      </Link>
       <p className="eyebrow mb-2">— SliceMatic · Admin</p>
       <h1 className="text-3xl font-semibold text-ink mb-6">Owner sign in</h1>
 

@@ -11,6 +11,7 @@
     "db:push": "npx supabase db push",
     "seed:menu": "node --import tsx --env-file=.env.local scripts/seed-menu.ts",
     "seed:orders": "node --import tsx --env-file=.env.local scripts/seed-orders.ts",
+    "seed:demo": "node --import tsx --env-file=.env.local scripts/seed-demo-orders.ts",
     "provision:admin": "node --import tsx --env-file=.env.local scripts/provision-admin.ts",
     "test:rls": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run tests/rls.integration.test.ts",
     "test:integration": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run tests/orders.integration.test.ts",

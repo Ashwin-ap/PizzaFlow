@@ -52,7 +52,7 @@ describe.skipIf(!hasCreds)("orders + menu routes (live DB)", () => {
       }),
     );
 
-  const line = { baseCode: "B1", pizzaCode: "P1", toppingCode: "T1" };
+  const line = { baseCode: "B1", pizzaCode: "P1", toppingCodes: ["T1"] };
 
   it("GET /api/menu returns grouped menu with pricePaise", async () => {
     const res = await GET();
@@ -70,7 +70,7 @@ describe.skipIf(!hasCreds)("orders + menu routes (live DB)", () => {
     // B3 Cheese Burst 229 + P7 BBQ 379 + T2 Extra Cheese 69 = ₹677 (single, no discount)
     const res = await postOrder(
       { name: "Test Buyer", phone: TEST_PHONE, paymentMode: "UPI",
-        lineItems: [{ baseCode: "B3", pizzaCode: "P7", toppingCode: "T2" }] },
+        lineItems: [{ baseCode: "B3", pizzaCode: "P7", toppingCodes: ["T2"] }] },
       { key: crypto.randomUUID() },
     );
     expect(res.status).toBe(201);
@@ -112,7 +112,7 @@ describe.skipIf(!hasCreds)("orders + menu routes (live DB)", () => {
   it("unknown code → 422 MENU_ITEM_NOT_FOUND", async () => {
     const res = await postOrder(
       { name: "Test Buyer", phone: TEST_PHONE, paymentMode: "Cash",
-        lineItems: [{ baseCode: "ZZ9", pizzaCode: "P1", toppingCode: "T1" }] },
+        lineItems: [{ baseCode: "ZZ9", pizzaCode: "P1", toppingCodes: ["T1"] }] },
       { key: crypto.randomUUID() },
     );
     expect(res.status).toBe(422);

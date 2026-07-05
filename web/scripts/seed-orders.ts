@@ -180,7 +180,7 @@ async function main(): Promise<void> {
         const selections = Array.from({ length: quantity }, () => ({
           base: pick(bases),
           pizza: pick(pizzas),
-          topping: pick(toppings),
+          toppings: [pick(toppings)],
         }));
         const bill = computeBill(selections);
         rows.push({

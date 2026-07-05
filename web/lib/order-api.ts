@@ -24,11 +24,11 @@ export interface Menu {
   toppings: MenuItem[];
 }
 
-/** One configured pizza as the order body expects it — codes only. */
+/** One configured pizza as the order body expects it — codes only. 1–5 toppings. */
 export interface OrderLineItem {
   baseCode: string;
   pizzaCode: string;
-  toppingCode: string;
+  toppingCodes: string[];
 }
 
 /** Mirrors the payment_mode enum (DB) and paymentSchema (Zod). */

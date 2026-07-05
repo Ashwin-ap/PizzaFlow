@@ -1,70 +1,151 @@
-import { rupees, type Bill } from "@/lib/pricing";
-import { GST_RATE, DISCOUNT_RATE } from "@/lib/pricing";
+import { rupees, GST_RATE, DISCOUNT_RATE, DISCOUNT_THRESHOLD, type Bill } from "@/lib/pricing";
 
 /**
- * Itemised bill (FR-10) — a real table, not a textbox. Every numeric cell uses
- * `.tnum` and is right-aligned so the ₹ amounts align on the decimal. The summary
- * sits in a recessed `canvas-soft` panel (PRD §16.2). The `bill` is whatever
- * computeBill() produced — identical to the server's, so it agrees to the paise.
+ * Itemised "retail invoice" (FR-10) — the Stage-2 receipt look: a branded header,
+ * a customer block, a bordered Description/Price table with a per-pizza breakdown
+ * (crust + all toppings), the summary rows and a bold GRAND TOTAL, then the receipt
+ * footer. Rendered in the project theme (Cardinal Red + Obsidian, JetBrains-Mono
+ * body). The `bill` is exactly what computeBill() produced — agrees with the server
+ * to the paise.
  */
-export function BillTable({ bill }: { bill: Bill }) {
+export function BillTable({
+  bill,
+  customerName,
+  customerPhone,
+  timestamp,
+}: {
+  bill: Bill;
+  customerName?: string;
+  customerPhone?: string;
+  timestamp?: string;
+}) {
   const pct = (r: number) => `${Math.round(r * 100)}%`;
+  const remaining = Math.max(0, DISCOUNT_THRESHOLD - bill.quantity);
+
   return (
-    <div className="bg-canvas-soft border border-hairline rounded-2xl p-4 md:p-6">
+    <div
+      className="card mx-auto max-w-xl p-6 md:p-8"
+      style={{ fontFamily: "var(--font-mono)" }}
+    >
+      {/* Brand header */}
+      <div className="text-center">
+        <p className="text-xl font-bold text-primary md:text-2xl">🍕 SliceMatic Pizza Kitchen 🍕</p>
+        <p className="mt-1 text-sm text-ink-mute">Crafting Happiness, One Slice at a Time</p>
+      </div>
+
+      <Dashed />
+
+      <p className="text-center text-lg font-bold tracking-[0.35em] text-ink">RETAIL INVOICE</p>
+
+      {(customerName || customerPhone || timestamp) && (
+        <div className="mt-4 space-y-1 text-sm">
+          {customerName && (
+            <p>
+              <span className="font-bold text-ink">Customer:</span>{" "}
+              <span className="text-ink-secondary">{customerName}</span>
+            </p>
+          )}
+          {customerPhone && (
+            <p>
+              <span className="font-bold text-ink">Phone:</span>{" "}
+              <span className="tnum text-ink-secondary">{customerPhone}</span>
+            </p>
+          )}
+          {timestamp && (
+            <p>
+              <span className="font-bold text-ink">Timestamp:</span>{" "}
+              <span className="tnum text-ink-secondary">{timestamp}</span>
+            </p>
+          )}
+        </div>
+      )}
+
+      <Dashed />
+
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="text-left text-ink-mute">
-              <th className="py-2 pr-2 font-medium">#</th>
-              <th className="py-2 pr-2 font-medium">Base</th>
-              <th className="py-2 pr-2 font-medium">Pizza</th>
-              <th className="py-2 pr-2 font-medium">Topping</th>
-              <th className="py-2 pl-2 font-medium text-right">Unit</th>
+            <tr>
+              <Th>Description</Th>
+              <Th>Price</Th>
             </tr>
           </thead>
           <tbody>
             {bill.lineItems.map((li, i) => (
-              <tr key={i} className="border-t border-hairline align-top">
-                <td className="py-2 pr-2 tnum text-ink-mute">{i + 1}</td>
-                <td className="py-2 pr-2 text-ink-secondary">
-                  {li.base.name}
-                  <span className="tnum text-ink-mute"> · {rupees(li.base.pricePaise)}</span>
-                </td>
-                <td className="py-2 pr-2 text-ink-secondary">
-                  {li.pizza.name}
-                  <span className="tnum text-ink-mute"> · {rupees(li.pizza.pricePaise)}</span>
-                </td>
-                <td className="py-2 pr-2 text-ink-secondary">
-                  {li.topping.name}
-                  <span className="tnum text-ink-mute"> · {rupees(li.topping.pricePaise)}</span>
-                </td>
-                <td className="py-2 pl-2 tnum text-right text-ink">{rupees(li.unitPricePaise)}</td>
+              <tr key={i}>
+                <Td className="align-top">
+                  <span className="font-bold text-ink">
+                    🍕 {li.pizza.name} <span className="font-normal text-ink-mute">(x1)</span>
+                  </span>
+                  <span className="mt-0.5 block text-xs text-ink-mute">
+                    Crust: {li.base.name} | Toppings: {li.toppings.map((t) => t.name).join(", ")}
+                  </span>
+                </Td>
+                <Td className="align-top tnum text-ink-secondary">{rupees(li.unitPricePaise)}</Td>
               </tr>
             ))}
+
+            <SummaryRow label="Total Items:" value={`${bill.quantity} ${bill.quantity === 1 ? "pizza" : "pizzas"}`} />
+            <SummaryRow label="Subtotal:" value={rupees(bill.subtotalPaise)} />
+            <SummaryRow
+              label={bill.discountApplied ? `Discount (${pct(DISCOUNT_RATE)}):` : "Discount:"}
+              value={bill.discountApplied ? `− ${rupees(bill.discountPaise)}` : rupees(0)}
+              accent={bill.discountApplied}
+            />
+            <SummaryRow label={`GST (${pct(GST_RATE)}):`} value={`+${rupees(bill.gstPaise)}`} />
+
+            <tr>
+              <td
+                className="border-x border-hairline px-3 py-3 text-base font-bold text-ink"
+                style={{ borderTop: "2px solid var(--color-ink)" }}
+              >
+                GRAND TOTAL:
+              </td>
+              <td
+                className="tnum border-x border-hairline px-3 py-3 text-base font-bold text-ink"
+                style={{ borderTop: "2px solid var(--color-ink)" }}
+              >
+                {rupees(bill.totalPaise)}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
 
-      <dl className="mt-4 space-y-1.5 border-t border-hairline pt-4 text-sm">
-        <Row label={`Subtotal (${bill.quantity} ${bill.quantity === 1 ? "pizza" : "pizzas"})`} value={rupees(bill.subtotalPaise)} />
-        {bill.discountApplied && (
-          <Row label={`Discount (${pct(DISCOUNT_RATE)})`} value={`− ${rupees(bill.discountPaise)}`} accent="green" />
+      <Dashed />
+
+      <div className="space-y-1.5 text-center text-sm text-ink-mute">
+        {remaining > 0 && (
+          <p>
+            Add {remaining} more pizza(s) to unlock {pct(DISCOUNT_RATE)} bulk discount.
+          </p>
         )}
-        <Row label={`GST (${pct(GST_RATE)})`} value={rupees(bill.gstPaise)} />
-        <div className="flex items-baseline justify-between border-t border-hairline pt-2 mt-1">
-          <dt className="text-base font-semibold text-ink">Total</dt>
-          <dd className="tnum text-lg font-semibold text-ink">{rupees(bill.totalPaise)}</dd>
-        </div>
-      </dl>
+        <p>Thank you for choosing SliceMatic!</p>
+        <p>Your order details are locked for checkout.</p>
+      </div>
     </div>
   );
 }
 
-function Row({ label, value, accent }: { label: string; value: string; accent?: "green" }) {
+function Dashed() {
+  return <div className="my-4" style={{ borderTop: "1.5px dashed var(--color-ink-mute)" }} />;
+}
+
+function Th({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between">
-      <dt className="text-ink-secondary">{label}</dt>
-      <dd className={`tnum ${accent === "green" ? "text-green" : "text-ink-secondary"}`}>{value}</dd>
-    </div>
+    <th className="border border-hairline px-3 py-2 text-left font-bold text-ink">{children}</th>
+  );
+}
+
+function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <td className={`border border-hairline px-3 py-2 ${className}`}>{children}</td>;
+}
+
+function SummaryRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <tr>
+      <Td className="text-ink-secondary">{label}</Td>
+      <Td className={`tnum ${accent ? "text-primary" : "text-ink-secondary"}`}>{value}</Td>
+    </tr>
   );
 }

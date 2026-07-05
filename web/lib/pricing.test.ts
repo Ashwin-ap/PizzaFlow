@@ -15,7 +15,7 @@ const item = (pricePaise: number): { code: string; name: string; pricePaise: num
 const sel = (b: number, p: number, t: number): Selected => ({
   base: item(b),
   pizza: item(p),
-  topping: item(t),
+  toppings: [item(t)],
 });
 const times = (n: number, s: Selected): Selected[] => Array.from({ length: n }, () => s);
 
@@ -42,6 +42,16 @@ describe("computeBill — PRD §23 worked traces", () => {
     expect(bill.gstPaise).toBe(8946);
     expect(bill.totalPaise).toBe(58646);
     expect(rupees(bill.totalPaise)).toBe("₹586.46");
+  });
+});
+
+describe("computeBill — multiple toppings", () => {
+  it("sums every topping into the pizza's unit price", () => {
+    const bill = computeBill([
+      { base: item(10000), pizza: item(20000), toppings: [item(4000), item(5000), item(3000)] },
+    ]);
+    expect(bill.lineItems[0].unitPricePaise).toBe(42000); // 100 + 200 + (40+50+30)
+    expect(bill.subtotalPaise).toBe(42000);
   });
 });
 

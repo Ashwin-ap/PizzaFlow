@@ -6,7 +6,14 @@ import { NAME_ERR, PHONE_ERR } from "@/lib/validation";
 
 const setup = () => {
   const onNext = vi.fn();
-  render(<IntakeForm initial={{ name: "", phone: "" }} onNext={onNext} />);
+  render(
+    <IntakeForm
+      initial={{ name: "", phone: "" }}
+      cartCount={0}
+      onPickCraving={vi.fn()}
+      onNext={onNext}
+    />,
+  );
   return { onNext, user: userEvent.setup() };
 };
 
@@ -15,7 +22,7 @@ describe("IntakeForm (FR-1 / FR-2)", () => {
     const { onNext, user } = setup();
     await user.type(screen.getByLabelText("Name"), "   ");
     await user.type(screen.getByLabelText("Phone"), "9876543210");
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: /start my order/i }));
     expect(screen.getByText(NAME_ERR)).toBeInTheDocument();
     expect(onNext).not.toHaveBeenCalled();
   });
@@ -24,7 +31,7 @@ describe("IntakeForm (FR-1 / FR-2)", () => {
     const { onNext, user } = setup();
     await user.type(screen.getByLabelText("Name"), "Ravi Kumar");
     await user.type(screen.getByLabelText("Phone"), "1234567890");
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: /start my order/i }));
     expect(screen.getByText(PHONE_ERR)).toBeInTheDocument();
     expect(onNext).not.toHaveBeenCalled();
   });
@@ -33,7 +40,7 @@ describe("IntakeForm (FR-1 / FR-2)", () => {
     const { onNext, user } = setup();
     await user.type(screen.getByLabelText("Name"), "  Ravi Kumar  ");
     await user.type(screen.getByLabelText("Phone"), "9876543210");
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: /start my order/i }));
     expect(onNext).toHaveBeenCalledWith({ name: "Ravi Kumar", phone: "9876543210" });
   });
 });

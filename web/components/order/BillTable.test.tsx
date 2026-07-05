@@ -6,7 +6,7 @@ import { computeBill, type Selected } from "@/lib/pricing";
 const sel = (b: number, p: number, t: number): Selected => ({
   base: { code: "b", name: "Base", pricePaise: b },
   pizza: { code: "p", name: "Pizza", pricePaise: p },
-  topping: { code: "t", name: "Topping", pricePaise: t },
+  toppings: [{ code: "t", name: "Topping", pricePaise: t }],
 });
 const times = (n: number, s: Selected) => Array.from({ length: n }, () => s);
 
@@ -19,9 +19,10 @@ describe("BillTable — §23 worked traces", () => {
     expect(screen.getByText(/Discount/)).toBeInTheDocument();
   });
 
-  it("§23.2: single (149+299+49) shows ₹586.46 and NO discount row", () => {
+  it("§23.2: single (149+299+49) shows ₹586.46 and NO 10% discount applied", () => {
     render(<BillTable bill={computeBill([sel(14900, 29900, 4900)])} />);
     expect(screen.getByText("₹586.46")).toBeInTheDocument();
-    expect(screen.queryByText(/Discount/)).not.toBeInTheDocument();
+    // The invoice always lists a Discount line, but at ₹0.00 with no "(10%)" label.
+    expect(screen.queryByText(/Discount \(10%\)/)).not.toBeInTheDocument();
   });
 });

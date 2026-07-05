@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
     // 5) Resolve every code to a DB row (available items only).
     const codes = Array.from(
-      new Set(body.lineItems.flatMap((li) => [li.baseCode, li.pizzaCode, li.toppingCode])),
+      new Set(body.lineItems.flatMap((li) => [li.baseCode, li.pizzaCode, ...li.toppingCodes])),
     );
     const { data: menuData, error: menuErr } = await supabaseService
       .from("menu_items")
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
 
     // 6) Build Selected[] from DB prices; unknown/unavailable code → 422.
     const selected: Selected[] = [];
-    const dbLines: { base: MenuItemRow; pizza: MenuItemRow; topping: MenuItemRow }[] = [];
+    const dbLines: { base: MenuItemRow; pizza: MenuItemRow; toppings: MenuItemRow[] }[] = [];
     const toPriced = (r: MenuItemRow): PricedItem => ({
       code: r.code,
       name: r.name,
@@ -74,19 +74,24 @@ export async function POST(request: Request) {
     for (const li of body.lineItems) {
       const base = find("base", li.baseCode);
       const pizza = find("pizza", li.pizzaCode);
-      const topping = find("topping", li.toppingCode);
-      if (!base || !pizza || !topping) {
+      const toppings = li.toppingCodes.map((c) => find("topping", c));
+      if (!base || !pizza || toppings.some((t) => !t)) {
         const missing = [
           !base && li.baseCode,
           !pizza && li.pizzaCode,
-          !topping && li.toppingCode,
+          ...li.toppingCodes.filter((c) => !find("topping", c)),
         ]
           .filter(Boolean)
           .join(", ");
         return err("MENU_ITEM_NOT_FOUND", `Unknown or unavailable menu item(s): ${missing}`);
       }
-      selected.push({ base: toPriced(base), pizza: toPriced(pizza), topping: toPriced(topping) });
-      dbLines.push({ base, pizza, topping });
+      const toppingRows = toppings as MenuItemRow[];
+      selected.push({
+        base: toPriced(base),
+        pizza: toPriced(pizza),
+        toppings: toppingRows.map(toPriced),
+      });
+      dbLines.push({ base, pizza, toppings: toppingRows });
     }
 
     // 7) The ONLY pricer. Client-sent prices (if any) were already stripped by Zod.
@@ -105,19 +110,31 @@ export async function POST(request: Request) {
       totalPaise: bill.totalPaise,
       paymentMode: body.paymentMode,
       idempotencyKey,
-      lineItems: bill.lineItems.map((li, i) => ({
-        lineNo: i + 1,
-        baseItemId: dbLines[i]!.base.id,
-        pizzaItemId: dbLines[i]!.pizza.id,
-        toppingItemId: dbLines[i]!.topping.id,
-        baseName: li.base.name,
-        pizzaName: li.pizza.name,
-        toppingName: li.topping.name,
-        basePricePaise: li.base.pricePaise,
-        pizzaPricePaise: li.pizza.pricePaise,
-        toppingPricePaise: li.topping.pricePaise,
-        unitPricePaise: li.unitPricePaise,
-      })),
+      lineItems: bill.lineItems.map((li, i) => {
+        const toppingRows = dbLines[i]!.toppings;
+        // Legacy single-topping columns carry a summary so pre-migration reads,
+        // admin exports and the forecast still work: name = joined, price = sum,
+        // id = the first topping. The full per-topping snapshot rides in `toppings`.
+        const toppingSumPaise = li.toppings.reduce((s, t) => s + t.pricePaise, 0);
+        return {
+          lineNo: i + 1,
+          baseItemId: dbLines[i]!.base.id,
+          pizzaItemId: dbLines[i]!.pizza.id,
+          toppingItemId: toppingRows[0]!.id,
+          baseName: li.base.name,
+          pizzaName: li.pizza.name,
+          toppingName: li.toppings.map((t) => t.name).join(", "),
+          basePricePaise: li.base.pricePaise,
+          pizzaPricePaise: li.pizza.pricePaise,
+          toppingPricePaise: toppingSumPaise,
+          unitPricePaise: li.unitPricePaise,
+          toppings: toppingRows.map((r, j) => ({
+            itemId: r.id,
+            name: li.toppings[j]!.name,
+            pricePaise: li.toppings[j]!.pricePaise,
+          })),
+        };
+      }),
     };
 
     const { data: order, error: rpcErr } = await supabaseService.rpc("create_order", { payload });

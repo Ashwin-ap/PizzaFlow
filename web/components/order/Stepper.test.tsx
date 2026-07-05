@@ -15,7 +15,7 @@ const singleBill = () => {
   const s: Selected = {
     base: { code: "B1", name: "Thin Crust", pricePaise: 14900 },
     pizza: { code: "P1", name: "Margherita", pricePaise: 29900 },
-    topping: { code: "T1", name: "Black Olives", pricePaise: 4900 },
+    toppings: [{ code: "T1", name: "Black Olives", pricePaise: 4900 }],
   };
   return computeBill([s]);
 };
@@ -62,7 +62,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Stepper — end to end", () => {
-  it("places an order through all 7 steps and confirms with the server bill", async () => {
+  it("places an order through the full flow and confirms with the server bill", async () => {
     vi.stubGlobal("fetch", mockFetch(true));
     const user = userEvent.setup();
     render(<Stepper />);
@@ -70,32 +70,32 @@ describe("Stepper — end to end", () => {
     // 1) Intake
     await user.type(screen.getByLabelText("Name"), "Ravi Kumar");
     await user.type(screen.getByLabelText("Phone"), "9876543210");
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: /start my order/i }));
 
-    // 2) Recommendation — accept the pick (prefills builder row 1)
-    expect(await screen.findByText(/Margherita/)).toBeInTheDocument();
-    await user.click(await screen.findByRole("button", { name: "Use this" }));
+    // 2) Recommendation — accept the pick (seeds the first pizza's pizza+topping)
+    expect(await screen.findByText(/Margherita/, { selector: "p" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /use this/i }));
 
-    // 3) Quantity
-    await user.type(screen.getByLabelText("Number of pizzas"), "1");
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    // 3) Build — the recommended pizza is pre-selected; add it to the cart, then review
+    await user.click(await screen.findByRole("button", { name: /Add to cart/ }));
+    // The cart's "Review bill · ₹586.46" CTA (anchored ^ to skip the mobile cart-bar).
+    await user.click(await screen.findByRole("button", { name: /^Review bill/ }));
 
-    // 4) Builder → 5) Bill
-    await user.click(await screen.findByRole("button", { name: "Review bill" }));
+    // 4) Bill → payment
     expect(await screen.findByText("₹586.46")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Continue to payment" }));
 
-    // 6) Payment → place (default Cash)
+    // 5) Payment → place (default Cash)
     await user.click(await screen.findByRole("button", { name: "Place order" }));
 
-    // 7) Confirmation echoes the saved order + Cash copy
+    // 6) Confirmation echoes the saved order + Cash copy
     expect(await screen.findByText(/Thanks, Ravi Kumar/)).toBeInTheDocument();
     expect(screen.getByText("₹586.46")).toBeInTheDocument();
     expect(screen.getByText(/pay the rider/i)).toBeInTheDocument();
 
-    // "New order" resets back to intake
-    await user.click(screen.getByRole("button", { name: "New order" }));
-    expect(await screen.findByText(/Who's ordering/)).toBeInTheDocument();
+    // "Start a new order" resets back to intake
+    await user.click(screen.getByRole("button", { name: "Start a new order" }));
+    expect(await screen.findByText(/built your way/i)).toBeInTheDocument();
   });
 
   it("FR-9: a menu-load failure disables ordering with a retry, no crash", async () => {
